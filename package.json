@@ -1,0 +1,11 @@
+{
+  "name": "tasksmith",
+  "version": "1.0.0",
+  "description": "",
+  "main": "tasksmith.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "sinclairzx81",
+  "license": "MIT"
+}
