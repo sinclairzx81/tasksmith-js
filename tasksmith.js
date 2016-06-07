@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------
 
-tasksmith.js - lightweight task runner for node.
+tasksmith.js - minimal task runner for node.
 
 The MIT License (MIT)
 
@@ -206,8 +206,9 @@ const cli = (argv, tasks) => {
   } else {
     return new Stream(observer => {
       tasks[args[0]]
-        .on("data",   data => observer.next(data))
-        .on("error",  error => observer.next(error.toString()))
+        .on("data",   data  => observer.next(data))
+        .on("error",  error => observer.error(error))
+        .on("end",    data  => observer.end())
         .begin()
     })
   }
