@@ -1,6 +1,6 @@
 # tasksmith-js
 
-### A lightweight no dependency task runner for node.
+### minimal task runner for node.
 
 ```js
 "use strict";
@@ -29,7 +29,7 @@ workflows that interact with the command line shell and javascript. Includes sup
 tasksmith provides the following interface, where each method returns a task stream which can
 be composed into larger units of work.
 
-```
+```js
 const task = require("tasksmith")
 
 // executes this shell command.
@@ -50,8 +50,8 @@ task.parallel([
   task.shell("echo world")
 ])
 
-
 ```
+
 ### streams
 
 All tasksmith functions all return a stream which emits data either from the shell process's stdout, or the 

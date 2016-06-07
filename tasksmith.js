@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------
 
-tasksmith.js - light task runner for node.
+tasksmith.js - lightweight task runner for node.
 
 The MIT License (MIT)
 
