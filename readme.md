@@ -7,26 +7,36 @@
 
 const task = require('./tasksmith.js')
 
-let program = task.series([
-  task.shell("npm help"),
-  task.script(task => {
-    task.echo("hello world")
-    task.done()
-  })
+let hello = () => task.shell("echo hello")
+let world = () => task.script(t => {
+  t.echo("world")
+  t.done()
+})
+let app = task.series([
+  hello(),
+  world()
 ])
 
-program.run()
+app().run()
 ```
 
 ### overview
 
-tasksmith is a minimal task based library that enables developers to setup fairly sophisticated 
-workflows that interact between the shell and javascript. Provides support for 
-running tasks in series or in parallel.
+tasksmith is a no dependency task library for node that allows developers quickly script 
+sophisticated javascript and shell automation workflows. tasksmith supports the parallel execution
+of shell / javascript task as blocks, making it useful for companion tooling for watch orientated
+developer tooling as well as general project house keeping.
 
 ### core functions
 
-tasksmith provides the following interface.
+tasksmith exposes four primary functions which all other functionality is built around.
+```
+script(..)     - runs some javascript
+shell(..)      - runs a shell command
+series([..])   - runs a block of tasks sequentially.
+parallel([..]) - runs a block of tasks in parallel.
+```
+the following are a few examples.
 
 ```js
 
