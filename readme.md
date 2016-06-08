@@ -1,106 +1,107 @@
 # tasksmith-js
 
-### minimal task runner for node.
+### minimal task runner for node
 
 ```js
 "use strict";
 
-const task = require("tasksmith")
+const task = require('./tasksmith.js')
 
 let program = task.series([
-  task.shell("npm install stuff"),
-  task.script(observer => {
-    observer.next("hello world")
-    observer.end()
+  task.shell("npm help"),
+  task.script(task => {
+    task.echo("hello world")
+    task.done()
   })
 ])
 
-program.pipe(process.stdout)
-
+program.run()
 ```
 
 ### overview
 
-tasksmith is a minimal task based library that allows developers to setup fairly sohphisticated 
-workflows that interact with the command line shell and javascript. Includes support for parallel execution of tasks.
+tasksmith is a minimal task based library that enables developers to setup fairly sophisticated 
+workflows that interact between the shell and javascript. Provides support for 
+running tasks in series or in parallel.
 
-### interface
+### core functions
 
-tasksmith provides the following interface, where each method returns a task stream which can
-be composed into larger units of work.
+tasksmith provides the following interface.
 
 ```js
-const task = require("tasksmith")
 
-// executes this shell command.
-task.shell("npm install something")
+// run javascript.
+task.script(t => {
+  t.echo("hello")
+  t.done()
+})
 
-// executes this javascript.
-task.script(observer => observer.end())
+// run shell command.
+task.shell("echo hello")
 
-// executes these tasks in series.
+// runs in series.
 task.series([
-  task.shell("echo hello"),
-  task.shell("echo world")
+  task.script(t => t.done()),
+  task.script(t => t.done()),
+  task.script(t => t.done())
 ])
 
-// executes these tasks in parallel.
+// run in parallel.
 task.parallel([
-  task.shell("echo hello"),
-  task.shell("echo world")
+  task.shell("echo 1"),
+  task.shell("echo 2"),
+  task.shell("echo 3")
 ])
 
+// example:
+let program = task.series([
+  // run this...
+  task.script(t => {
+    t.echo("running")
+    t.done()
+  })
+  // then run this stuff in parallel.  
+  task.parallel([ 
+    task.script(t => t.done()),         
+    task.script(t => t.done()),  
+    task.script(t => t.done())         
+  ]),      
+  // then run this stuff in series.                                      
+  task.series([                  
+    task.shell("echo 1"),                      
+    task.shell("echo 2"),       
+    task.shell("echo 3")               
+  ])                             
+])
+
+program.run()
 ```
 
-### streams
+### running tasks.
 
-All tasksmith functions all return a stream which emits data either from the shell process's stdout, or the 
-javascript function calling next(). This data can be observed in various ways. 
+All tasks are observable event streams, any data emitted from the task (either by the shell process stdout, 
+or the script echoing something) can be subscribed to. Useful for logging.
 
 ```js
-// simple task setup, runs forever,
-// and emits data from script and from
-// the shell.
-let program = task.parallel([ 
-  task.script(observer => { 
-    setInterval(() => observer.next("on and "), 1000)
-  }),
-  task.series([
-    task.shell("echo 1"),
-    task.shell("echo 2"),
-    task.shell("echo 3"),
-    task.shell("echo 4"),
-  ])
+let task = require('./tasksmith.js')
+
+let program = task.series([ 
+  task.echo("step 1"),
+  task.echo("step 2"),
+  task.echo("step 3"),
+  task.echo("step 4"),
 ])
 
-// pipe the program to std out. this will 
-// automatically start reading the the tasks
-// stream and write to the given stream.
-program.pipe(process.stdout)
-
-// or, you can manually observe stream events. 
-// note: you must call begin() to kick off the  
-// stream.
 program.on("data",  data  => console.log(data))
        .on("error", error => console.log(error))
        .on("end",   ()    => console.log("done"))
-       .begin()
-
-// or, for tasks that are known to complete, you can 
-// convert to a promise and run a task this way. 
-task.shell("npm")
-    .promise(true) // true to buffer, 
-    .then(buf    => process.stdout.write(buf.join("")))
-    .catch(error => console.log(error))
-
-// note: buffered data is given as a array, callers may
-// wish to join().
+       .run()
 ```
 
 ### cli
 
-for convenience, tasksmith contains a small cli for running tasks from the command line. 
-The following writes any output to stdout.
+For convenience, tasksmith contains a small cli, useful for setting up tasks to interact with npm or other 
+task running infrastructure.
 
 ```js
 let program = task.cli(process.argv, {
@@ -109,7 +110,10 @@ let program = task.cli(process.argv, {
   "publish" : task.shell("publish stuff")
 })
 
-program.pipe(process.stdout)
+program.on("data",  data  => console.log(data))
+       .on("error", error => console.log(error))
+       .on("end",   ()    => console.log("done"))
+       .run()
 ```
 which can be run at the command line with.
 ```
