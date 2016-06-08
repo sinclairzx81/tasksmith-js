@@ -481,17 +481,20 @@ const copy = (src, dst) => new Stream(task => {
     let dst_info = fs_info(dst)
     let gather   = fs_tree(src)
     gather.forEach(src_info => {
-      let source = path.join(src_info.dirname, src_info.basename)
-      let target = path.join(dst_info.dirname, dst_info.basename,
-                             src_info.relname, src_info.basename)
       switch(src_info.type) {
         case "invalid"   : throw fs_error("copy", "invalid file or directory src path.", src)
         case "empty"     : throw fs_error("copy", "no file or directory exists at the given src.", src)
-        case "directory" :
-          task.echo(fs_message("copy", [target]))
-          fs_build_directory(target)
+        case "directory":
+          let directory = path.join(dst_info.dirname, 
+                                    dst_info.basename,
+                                    src_info.relname)
+          task.echo(fs_message("mkdir", [directory]))
+          fs_build_directory(directory)
           break;
         case "file":
+          let source = path.join(src_info.dirname, src_info.basename)
+          let target = path.join(dst_info.dirname, dst_info.basename,
+                                src_info.relname, src_info.basename)
           task.echo(fs_message("copy", [source, target]))
           fs_copy_file(source, target)
           break;
