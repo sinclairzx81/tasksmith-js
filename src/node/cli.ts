@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------
 
-signature-js - javascript library for working with overloaded method signatures.
+tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
@@ -25,3 +25,31 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
+
+/// <reference path="../typings/node/node.d.ts" />
+
+import {ITask}  from "../core/task"
+import {script} from "../core/script"
+
+/**
+ * returns a task that creates a simple cli to run tasks by name.
+ * @param {Array<string>} process.argv or similar.
+ * @param {{[taskname: string]: Task}} a dictionary / object containing named tasks.
+ * @returns {ITask}
+ */
+export const cli = (argv: string[], tasks: {[taskname: string]: ITask}) => script("node/cli", context => {
+  let args = process.argv.reduce((acc, c, index) => {
+    if(index > 1) acc.push(c)
+    return acc
+  }, [])
+  if(args.length !== 1 || tasks[args[0]] === undefined) {
+    context.log("tasks:")
+    Object.keys(tasks).forEach(key => context.log(" - ", key))
+    context.ok()
+  } else {
+    let task = tasks[args[0]]
+    context.log("running: [" + args[0] + "]")
+    context.run(task).then(_      => context.ok())
+                     .catch(error => context.fail(error.message))
+  }
+})

@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------
 
-signature-js - javascript library for working with overloaded method signatures.
+tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
@@ -25,3 +25,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
+
+
+import {tabulate, TabulateObject}  from "../common/tabulate"
+
+let event_format = tabulate([
+  {key: "time",   width: 10, pad: 1, map: time => time.toTimeString() },
+  {key: "type",   width: 10, pad: 1},
+  {key: "task",   width: 16, pad: 1},
+  {key: "data",   width: 80, wrap: true},
+])
+
+/**
+ * formats a event into a console friendly format.
+ * @param {TaskEvent} The event to format.
+ * @returns {string}
+ */
+export const format = (event: any) : string => event_format(event as TabulateObject)

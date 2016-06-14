@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------
 
-signature-js - javascript library for working with overloaded method signatures.
+tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
@@ -25,3 +25,40 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
+
+import {signature} from "../common/signature"
+import {ITask}     from "./task"
+import {script}    from "./script"
+
+
+/**
+ * returns a task that completes successfully.
+ * @param {string} info message.
+ * returns {ITask}
+ */
+export function ok(info: string): ITask
+
+/**
+ * returns a task that completes successfully.
+ * returns {ITask}
+ */
+export function ok(): ITask
+
+/**
+ * returns a task that completes successfully.
+ * @param {any[]} arguments
+ * returns {ITask}
+ */
+export function ok(...args: any[]): ITask {
+  let param = signature<{
+    info: string
+  }>(args, [
+      { pattern: ["string"], map : (args) => ({ info: args[0] })  },
+      { pattern: [],         map : (args) => ({ info: null  })  },
+  ])
+  return script("core/ok", context => {
+    if(param.info !== null) 
+      context.log(param.info)
+    context.ok()
+  })
+}

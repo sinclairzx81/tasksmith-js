@@ -3,129 +3,185 @@
 ### minimal task runner for node
 
 ```js
-"use strict";
-
 const task = require('./tasksmith.js')
 
-let hello = () => task.shell("echo hello")
-let world = () => task.script(t => {
-  t.echo("world")
-  t.done()
+let mytask = task.series([
+  task.shell("npm install"),
+  task.shell("node myapp.js")
+])
+
+mytask.run()
+```
+
+## overview
+
+tasksmith is minimal no dependency task runner for node that allows developers to 
+script sophiticated workflows by composing them from smaller reusable tasks. 
+
+## building from source
+```
+npm install typescript -g
+node tasks build
+```
+## running tasks
+
+To run a task, call its run() function.
+
+```javascript
+task.delay(1000)
+    .run()
+    .then(() => console.log("done"))
+    .catch(error => console.log(error))
+
+```
+optionally, you can subscribe to any logging occuring during task execution.
+
+```javascript
+let mytask = task.series([
+  task.ok   ("running task 1"),
+  task.ok   ("running task 2"),
+  task.fail ("running task 3"),
+  task.ok   ("running task 4"),
+])
+
+// subscribe and run.
+mytask.subscribe(event => {
+  console.log(task.format(event))
+}).run()
+
+```
+
+## built in tasks
+
+### delay
+creates a task that will delay for the given number of milliseconds.
+
+```javascript
+let mytask = task.series([
+  task.delay("waiting 1 second", 1000),
+  task.delay("waiting 1 second", 1000),
+  task.delay("waiting 1 second", 1000)
+])
+```
+
+### dowhile
+creates a task that repeats while a condition is true.
+```javascript
+let dowhile = task.dowhile(next => next(true), () => task.series([
+   task.ok("running 1"),
+   task.ok("running 2"),
+   task.ok("running 3")
+]))
+```
+
+### fail
+creates a task that immediately fails.
+```javascript
+let mytask = () => task.series([
+  task.ok  ("running 1"),
+  task.ok  ("running 2"),
+  task.fail("running 3")
+])
+```
+
+### ifelse
+creates a task that executes either left or right based on a condition.
+```javascript
+let mytask = task.ifelse(
+    next => next(true), 
+    () => task.ok  ("running left"), 
+    () => task.fail("running right"))
+```
+### ifthen
+creates a task that will run a inner task if a condition is true. otherwise ok.
+```javascript
+let mytask = task.ifthen(
+    next => next(true), 
+    () => task.ok ("only if true"))
+```
+### ok
+returns a task that completes successfully.
+```
+let mytask = task.ok()
+```
+
+### parallel
+creates a task that runs its inner tasks in parallel.
+```javascript
+let mytask = () => task.parallel([
+  task.delay("running 1", 1000),
+  task.delay("running 2", 1000),
+  task.delay("running 3", 1000),
+])
+```
+### repeat
+creates a task that repeats the given task for the given number of iterations.
+```javascript
+let mytask = task.repeat(10, (i) => task.series([
+  task.ok(i + " -> 1 "),
+  task.ok(i + " -> 2 "),
+  task.ok(i + " -> 3 ")
+]))
+```
+
+### script
+creates a new script task.
+```javascript
+let mytask = task.script("custom/task", context => {
+  context.log("logging some info")
+  context.ok()
+  // or .. context.fail()
 })
-let app = task.series([
-  hello(),
-  world()
-])
-
-app().run()
 ```
 
-### overview
-
-tasksmith is a no dependency task library for node that allows developers quickly script 
-sophisticated javascript and shell automation workflows. tasksmith supports the parallel execution
-of shell / javascript task as blocks, making it useful for companion tooling for watch orientated
-developer tooling as well as general project house keeping.
-
-### core functions
-
-tasksmith exposes four primary functions which all other functionality is built around.
-```
-script(..)     - runs some javascript
-shell(..)      - runs a shell command
-series([..])   - runs a block of tasks sequentially.
-parallel([..]) - runs a block of tasks in parallel.
-```
-the following are a few examples.
-
-```js
-
-// run javascript.
-task.script(t => {
-  t.echo("hello")
-  t.done()
-})
-
-// run shell command.
-task.shell("echo hello")
-
-// runs in series.
-task.series([
-  task.script(t => t.done()),
-  task.script(t => t.done()),
-  task.script(t => t.done())
+### series
+creates a task that runs its inner tasks in series.
+```javascript
+let mytask = () => task.series([
+  task.delay("running 1", 1000),
+  task.delay("running 2", 1000),
+  task.delay("running 3", 1000)
 ])
-
-// run in parallel.
-task.parallel([
-  task.shell("echo 1"),
-  task.shell("echo 2"),
-  task.shell("echo 3")
-])
-
-// example:
-let program = task.series([
-  // run this...
-  task.script(t => {
-    t.echo("running")
-    t.done()
-  })
-  // then run this stuff in parallel.  
-  task.parallel([ 
-    task.script(t => t.done()),         
-    task.script(t => t.done()),  
-    task.script(t => t.done())         
-  ]),      
-  // then run this stuff in series.                                      
-  task.series([                  
-    task.shell("echo 1"),                      
-    task.shell("echo 2"),       
-    task.shell("echo 3")               
-  ])                             
-])
-
-program.run()
 ```
 
-### running tasks.
-
-All tasks are observable event streams, any data emitted from the task (either by the shell process stdout, 
-or the script echoing something) can be subscribed to. Useful for logging.
-
-```js
-let task = require('./tasksmith.js')
-
-let program = task.series([ 
-  task.echo("step 1"),
-  task.echo("step 2"),
-  task.echo("step 3"),
-  task.echo("step 4"),
-])
-
-program.on("data",  data  => console.log(data))
-       .on("error", error => console.log(error))
-       .on("end",   ()    => console.log("done"))
-       .run()
+### timeout
+creates a task that will fail if its inner task has not 
+completed within the given number of milliseconds.
+```javascript
+let mytask = task.timeout(3000, () => task.series([
+  task.delay(1000),
+  task.delay(1000),
+  task.delay(1000), // !!!
+  task.delay(1000),
+  task.delay(1000)
+]))
 ```
 
+### trycatch
+creates a task that will try the left task, and if fail, will fallback to the right task.
+```javascript
+let mytask = task.trycatch(
+    () => task.fail ("this task will fail."),
+    () => task.ok   ("so fallback to this task."))
+```
 ### cli
 
 For convenience, tasksmith contains a small cli, useful for setting up tasks to interact with npm or other 
 task running infrastructure.
 
 ```js
-let program = task.cli(process.argv, {
-  "install" : task.shell("install stuff"),
-  "build"   : task.shell("build stuff"),
-  "publish" : task.shell("publish stuff")
+let cli = task.cli(process.argv, {
+  "install" : task.shell("npm install"),
+  "watch"   : task.shell("tsc -w -p ./src/tsconfig.json"),
+  "build"   : task.shell("tsc -p ./src/tsconfig.json"),
+  "publish" : task.shell("npm publish ..")
 })
 
-program.on("data",  data  => console.log(data))
-       .on("error", error => console.log(error))
-       .on("end",   ()    => console.log("done"))
-       .run()
+cli.subscribe(event => {
+  console.log(task.format(event))
+}).run()
 ```
 which can be run at the command line with.
 ```
-node script.js [task]
+node your-task-script.js [name of task]
 ```
