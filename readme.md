@@ -50,8 +50,22 @@ mytask.subscribe(event => {
 }).run()
 
 ```
+which outputs the following
+```
+15:37:11  start     core/series
+15:37:11  start     core/ok
+15:37:11  log       core/ok         running task 1
+15:37:11  ok        core/ok
+15:37:11  start     core/ok
+15:37:11  log       core/ok         running task 2
+15:37:11  ok        core/ok
+15:37:11  start     core/fail
+15:37:11  log       core/fail       running task 3
+15:37:11  fail      core/fail
+15:37:11  fail      core/series
+```
 
-## built in tasks
+## tasks
 
 ### delay
 creates a task that will delay for the given number of milliseconds.
