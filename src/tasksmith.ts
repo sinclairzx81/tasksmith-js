@@ -65,7 +65,11 @@ export {
   /** core modules */
   delay,
   dowhile,
+  fail,
+  format,
   ifelse,
+  ifthen,
+  ok,
   parallel,
   repeat,
   script,

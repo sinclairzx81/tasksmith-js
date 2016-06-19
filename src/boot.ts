@@ -60,8 +60,8 @@ THE SOFTWARE.
 
 declare var require: Function
 
-let __defs = {}
-let __mods = {
+let definitions = {}
+let cached      = {
     "require": (arg, callback) => callback( require (arg) ),
     "exports": {}
 }
@@ -74,7 +74,7 @@ let __mods = {
  * @returns {void}
  */
 const define = (name, deps, fn) : void => {
-    __defs[name] = { deps: deps, fn: fn }
+    definitions[name] = { deps: deps, fn: fn }
 }
 
 /**
@@ -83,16 +83,22 @@ const define = (name, deps, fn) : void => {
  * @returns {any} the modules exports.
  */
 const __resolve = (name) : any => {
+
+    // if resolving exports, return empty object
+    // for caller to populate.
+    if(name === "exports") return  {}
+    
     // if module is cached, return it.
-    if (__mods[name] !== undefined) {
-        return __mods[name];
+    if (cached[name] !== undefined) {
+        return cached[name];
     }
+
     // if module amd definition exists, resolve it.
-    else if(__defs[name] !== undefined) {
-        var args = __defs[name].deps.map(function (name) { return __resolve(name); });
-        __defs[name].fn.apply({}, args);
-        return __mods[name] = args[__defs[name].deps.indexOf("exports")];
-    } 
+    else if(definitions[name] !== undefined) {
+        var args = definitions[name].deps.map(name => __resolve(name));
+        definitions[name].fn.apply({}, args);
+        return cached[name] = args[definitions[name].deps.indexOf("exports")];
+    }
     // still not found, require it.
     else {
         return require(name)
@@ -105,8 +111,8 @@ const __resolve = (name) : any => {
  * @returns {any} the modules exports.
  */
 const __collect = () : any => {
-    Object.keys(__defs).map(name => __resolve(name))
-    return __mods["exports"]
+    let ids = Object.keys(definitions)
+    return __resolve(ids[ids.length - 1])
 }
 
 //---------------------------------------------
