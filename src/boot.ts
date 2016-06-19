@@ -58,23 +58,17 @@ THE SOFTWARE.
 //
 //---------------------------------------------
 
+
+//---------------------------------------------
+// BEGIN: HEADER
+//---------------------------------------------
+
 declare var require: Function
 
-let definitions = {}
-let cached      = {
+let __definitions = {}
+let __cached      = {
     "require": (arg, callback) => callback( require (arg) ),
     "exports": {}
-}
-
-/**
- * The AMD define function.
- * @param {string} the name of the module.
- * @param {string[]} the names of dependencies.
- * @param {Function} the resolver function.
- * @returns {void}
- */
-const define = (name, deps, fn) : void => {
-    definitions[name] = { deps: deps, fn: fn }
 }
 
 /**
@@ -89,20 +83,17 @@ const __resolve = (name) : any => {
     if(name === "exports") return  {}
     
     // if module is cached, return it.
-    if (cached[name] !== undefined) {
-        return cached[name];
+    if (__cached[name] !== undefined) {
+        return __cached[name];
     }
-
     // if module amd definition exists, resolve it.
-    else if(definitions[name] !== undefined) {
-        var args = definitions[name].deps.map(name => __resolve(name));
-        definitions[name].fn.apply({}, args);
-        return cached[name] = args[definitions[name].deps.indexOf("exports")];
+    else if(__definitions[name] !== undefined) {
+        var args = __definitions[name].deps.map(name => __resolve(name));
+        __definitions[name].fn.apply({}, args);
+        return __cached[name] = args[__definitions[name].deps.indexOf("exports")];
     }
-    // still not found, require it.
-    else {
-        return require(name)
-    }
+    // still not found, try require it...(unusual case)
+    else { return require(name) }
 }
 
 /**
@@ -111,14 +102,38 @@ const __resolve = (name) : any => {
  * @returns {any} the modules exports.
  */
 const __collect = () : any => {
-    let ids = Object.keys(definitions)
+    let ids = Object.keys(__definitions)
     return __resolve(ids[ids.length - 1])
 }
 
+/**
+ * The AMD define function.
+ * @param {string} the name of the module.
+ * @param {string[]} the names of dependencies.
+ * @param {Function} the resolver function.
+ * @returns {void}
+ */
+const define = (name, deps, fn) : void => {
+    __definitions[name] = { deps: deps, fn: fn }
+}
 //---------------------------------------------
-// bundled AMD module goes here....
+// END: HEADER
+//---------------------------------------------
+
+
+//---------------------------------------------
+// BUNDLED MODULE HERE..
+//---------------------------------------------
+
+
+//---------------------------------------------
+// BEGIN: FOOTER
 //---------------------------------------------
 
 // module.exports = __collect()
+
+//---------------------------------------------
+// END: FOOTER
+//---------------------------------------------
 
 

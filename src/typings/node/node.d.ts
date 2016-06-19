@@ -1595,10 +1595,10 @@ declare module "fs" {
     export function appendFileSync(filename: string, data: any, options?: { encoding?: string; mode?: number; flag?: string; }): void;
     export function appendFileSync(filename: string, data: any, options?: { encoding?: string; mode?: string; flag?: string; }): void;
     export function watchFile(filename: string, listener: (curr: Stats, prev: Stats) => void): void;
-    export function watchFile(filename: string, options: { persistent?: boolean; interval?: number; }, listener: (curr: Stats, prev: Stats) => void): void;
+    export function watchFile(filename: string, options: {  persistent?: boolean; interval?: number; }, listener: (curr: Stats, prev: Stats) => void): void;
     export function unwatchFile(filename: string, listener?: (curr: Stats, prev: Stats) => void): void;
     export function watch(filename: string, listener?: (event: string, filename: string) => any): FSWatcher;
-    export function watch(filename: string, options: { persistent?: boolean; }, listener?: (event: string, filename: string) => any): FSWatcher;
+    export function watch(filename: string, options: {  encoding?: string; persistent?: boolean; recursive?:boolean;  }, listener?: (event: string, filename: string) => any): FSWatcher;
     export function exists(path: string, callback?: (exists: boolean) => void): void;
     export function existsSync(path: string): boolean;
     /** Constant for fs.access(). File is visible to the calling process. */

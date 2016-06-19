@@ -33,6 +33,26 @@ import {ITask}            from "../core/task"
 import {script}           from "../core/script"
 import {watch as fswatch} from "fs"
 
+
+/**
+ * creates a infinite task that repeats changes to the given file or directory path.
+ * @param {string} a message to log.
+ * @param {string} the file or directory path to watch.
+ * @param {boolean} indicates if the watchers inner task should run immediate before waiting on system notification. default is true.
+ * @param {() => ITask} a function to return a task on each iteration.
+ * @returns {ITask}
+ */
+export function watch(message: string, path: string, immediate: boolean, taskfunc: () => ITask) : ITask
+
+/**
+ * creates a infinite task that repeats changes to the given file or directory path.
+ * @param {string} the file or directory path to watch.
+ * @param {boolean} indicates if the watchers inner task should run immediate before waiting on system notification. default is true.
+ * @param {() => ITask} a function to return a task on each iteration.
+ * @returns {ITask}
+ */
+export function watch(path: string, immediate: boolean, taskfunc: () => ITask) : ITask
+
 /**
  * creates a infinite task that repeats changes to the given file or directory path.
  * @param {string} a message to log.
@@ -61,10 +81,13 @@ export function watch(...args: any[]) : ITask {
   let param = signature<{
     message  : string,
     path     : string,
+    immediate: boolean,
     taskfunc : () => ITask
   }>(args, [
-      { pattern: ["string", "string", "function"], map : (args) => ({ message: args[0], path: args[1], taskfunc: args[2]  })  },
-      { pattern: [ "string", "function"],          map : (args) => ({ message: null,    path: args[0], taskfunc: args[1]  })  }
+      { pattern: ["string", "string",  "boolean", "function"], map : (args) => ({ message: args[0], path: args[1], immediate: args[2], taskfunc: args[3]  })  },
+      { pattern: ["string", "boolean", "function"],            map : (args) => ({ message: null,    path: args[0], immediate: args[1], taskfunc: args[2]  })  },
+      { pattern: ["string", "string",  "function"],            map : (args) => ({ message: args[0], path: args[1], immediate: true,    taskfunc: args[2]  })  },
+      { pattern: ["string", "function"],                       map : (args) => ({ message: null,    path: args[0], immediate: true,    taskfunc: args[1]  })  }
   ])
   return script("node/watch", context => {
     if(param.message !== null) context.log(param.message)
@@ -78,6 +101,7 @@ export function watch(...args: any[]) : ITask {
                .catch(error => context.fail(error.message))
       }
     }
-    fswatch(param.path, (event, filename) => runtask())
+    if(param.immediate === true) runtask()
+    fswatch(param.path, {recursive: true}, (event, filename) => runtask())
   })
 }
