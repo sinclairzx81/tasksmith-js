@@ -65,7 +65,10 @@ which outputs the following
 15:37:11  fail      core/series
 ```
 
-## tasks
+## core tasks
+
+tasksmith provides a number of built in tasks, these tasks may be
+run from within any javascript environment.
 
 ### delay
 creates a task that will delay for the given number of milliseconds.
@@ -178,17 +181,55 @@ let mytask = task.trycatch(
     () => task.fail ("this task will fail."),
     () => task.ok   ("so fallback to this task."))
 ```
-### cli
+## node tasks
+
+The following tasks are specific to node.
 
 For convenience, tasksmith contains a small cli, useful for setting up tasks to interact with npm or other 
 task running infrastructure.
 
+### shell
+
+creates a task that executes a shell command.
+
 ```js
+let mytask = task.shell("npm install typescipt")
+```
+
+### watch
+
+creates a infinite task that repeats changes to the given file or directory path. 
+
+note: because this task never finishes, run within a parallel block.
+
+```js
+let mytask = task.parallel([
+  task.watch("./file1.txt", () => task.ok("file1 changed")),
+  task.watch("./folder1",   () => task.ok("folder1 changed"))
+])
+```
+
+### cli
+
+creates a task that creates a simple cli to run tasks by name from the command line.
+
+```js
+// file: ./mytasks.js
+// info: starter template.
+const task  = require("./tasksmith")
+
+let clean    = () => task.ok("running clean task.")
+let install  = () => task.ok("running install task.")
+let watch    = () => task.ok("running watch task.")
+let build    = () => task.ok("running build task.")
+let publish  = () => task.ok("running publish task.")
+
 let cli = task.cli(process.argv, {
-  "install" : task.shell("npm install"),
-  "watch"   : task.shell("tsc -w -p ./src/tsconfig.json"),
-  "build"   : task.shell("tsc -p ./src/tsconfig.json"),
-  "publish" : task.shell("npm publish ..")
+  "clean"   : clean(),
+  "install" : install(),
+  "watch"   : watch(),
+  "build"   : build(),
+  "publish" : publish()
 })
 
 cli.subscribe(event => {
@@ -196,6 +237,7 @@ cli.subscribe(event => {
 }).run()
 ```
 which can be run at the command line with.
+
 ```
-node your-task-script.js [name of task]
+node mytasks.js [name of task]
 ```
