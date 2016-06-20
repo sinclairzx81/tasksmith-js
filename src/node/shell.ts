@@ -86,8 +86,8 @@ export function shell(...args: any[]) : ITask {
     const windows  = /^win/.test(process.platform)
     let proc = spawn(windows ? 'cmd' : 'sh', [windows ? '/c':'-c', param.command])
     proc.stdout.setEncoding("utf8")
-    proc.stdout.on("data",  data  => context.log (data))
-    proc.stdout.on("error", error => context.fail(error.toString))
+    proc.stdout.on("data",  data  => context.log ("stdout:", data))
+    proc.stderr.on("data",  data  => context.log ("stderr:", data))
     proc.on("error",        error => context.fail(error.toString))
     proc.on("close",        code  => {
       // TODO: investigate better way of shutting down the shell.
