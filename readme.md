@@ -1,6 +1,6 @@
 # tasksmith-js
 
-### minimal task runner for node
+### task automation library for node
 
 ```js
 const task = require('./tasksmith.js')
