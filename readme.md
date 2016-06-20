@@ -185,9 +185,6 @@ let mytask = task.trycatch(
 
 The following tasks are specific to node.
 
-For convenience, tasksmith contains a small cli, useful for setting up tasks to interact with npm or other 
-task running infrastructure.
-
 ### shell
 
 creates a task that executes a shell command.
