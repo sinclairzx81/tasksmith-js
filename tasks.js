@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------
 
-tasksmith - minimal task automation library.
+tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
@@ -28,9 +28,12 @@ THE SOFTWARE.
 
 "use strict";
 
-//------------------------------------------------------
-// runs a shell command.
-//------------------------------------------------------
+/**
+ * (support) executes this shell script.
+ * @param   {string} the shell command to execute.
+ * @param   {number} the expected exit code for this process.
+ * @returns {Promise}
+ */
 const shell = (command, exitcode) => () => new Promise((resolve, reject) => {
   console.log("shell:", command)
   exitcode = exitcode || 0
@@ -47,9 +50,12 @@ const shell = (command, exitcode) => () => new Promise((resolve, reject) => {
   })
 })
 
-//------------------------------------------------------
-// concatinates the given files.
-//------------------------------------------------------
+/**
+ * (support) concatinates the given files together.
+ * @param {string} the target file to concatinate to.
+ * @param {string[]} the files to concatinate.
+ * @returns {Promise}
+ */
 const concat = (dst, files) => () => new Promise((resolve, reject) => {
   const fs = require("fs")
   console.log("concat:", files, "->", dst)
@@ -58,9 +64,12 @@ const concat = (dst, files) => () => new Promise((resolve, reject) => {
   resolve()
 })
 
-//------------------------------------------------------
-// appends this file with the given content.
-//------------------------------------------------------
+/**
+ * (support) appends this file with the given string content.
+ * @param {string} the file to append
+ * @param {string} the content to append.
+ * @returns {Promise}
+ */
 const append = (file, content) => () => new Promise((resolve, reject) => {
   const fs = require("fs")
   console.log("concat:", file, "->", content)
@@ -68,16 +77,19 @@ const append = (file, content) => () => new Promise((resolve, reject) => {
   resolve()
 })
 
-//------------------------------------------------------
-// mini cli ...
-//------------------------------------------------------
+/**
+ * (support) creates a small cli to execute tasks.
+ * @param {...args: any[]} the arguments given by process.argv
+ * @param {Promise[]} an array of promises.
+ * @returns {void}
+ */
 const cli = (argv, tasks) => () => {
   let args = process.argv.reduce((acc, c, index) => {
     if(index > 1) acc.push(c)
     return acc
   }, [])
   if(args.length !== 1 || tasks[args[0]] === undefined) {
-    console.log("[tasksmith-build-tasks]")
+    console.log("[tasksmith-support-tasks]")
     console.log("tasks:")
     Object.keys(tasks).forEach(key => console.log([" - ", key].join('')))
   } else {
@@ -88,19 +100,42 @@ const cli = (argv, tasks) => () => {
   }
 }
 
-//------------------------------------------------------
-// scripts...
-//------------------------------------------------------
-const clean = [ shell("rm -rf ./bin") ]
-const build = [
-  shell ("tsc -p ./src/build/boot/tsconfig.json       --outFile ./bin/boot.js"),
-  shell ("tsc -p ./src/build/tasksmith/tsconfig.json  --outFile ./bin/tasksmith.js"),
-  concat("./bin/tasksmith.js", [ "./license",  "./bin/boot.js", "./bin/tasksmith.js" ]),
-  append("./bin/tasksmith.js", "module.exports = __collect();"),
-  shell ("rm -rf ./bin/boot.js")
+/**
+ * (task) cleans out bin directory.
+ * @returns {Promise[]}
+ */
+const clean = () => [ shell("rm -rf ./bin") ]
+
+/**
+ * (task) builds browser profile.
+ * @returns {Promise[]}
+ */
+const build_browser = () => [
+  shell ("tsc ./src/tasksmith-browser.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/browser/tasksmith.js"),
 ]
-const program = cli(process.argv, {
-  "build" : build,
-  "clean" : clean,
-})
-program()
+
+/**
+ * (task) builds node profile.
+ * @returns {Promise[]}
+ */
+const build_node = () => [
+  shell ("tsc ./src/boot.ts        --removeComments --outFile ./bin/node/boot.js"),
+  shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/node/tasksmith.js"),
+  concat("./bin/node/tasksmith.js", [ "./license",  "./bin/node/boot.js", "./bin/node/tasksmith.js" ]),
+  append("./bin/node/tasksmith.js", "module.exports = collect();"),
+  shell ("rm -rf ./bin/node/boot.js")
+]
+
+/**
+ * (task) builds everything.
+ * @returns {Promise[]}
+ */
+const build_all = () => build_browser().concat(build_node())
+
+/** the cli configuration. */
+cli(process.argv, {
+  "build-node"    : build_node(),
+  "build-browser" : build_browser(),
+  "build-all"     : build_all(),
+  "clean"         : clean()
+})()

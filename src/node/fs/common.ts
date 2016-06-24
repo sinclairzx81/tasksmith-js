@@ -26,8 +26,6 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-/// <reference path="../../typings/node/node.d.ts" />
-
 //--------------------------------------------------
 // file system and path abstraction, this file
 // is used by the other fs task operations.

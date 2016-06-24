@@ -26,12 +26,6 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-/// <reference path="typings/node/node.d.ts" />
-
-// common modules.
-import {signature}              from "./common/signature"
-import {tabulate}               from "./common/tabulate"
-
 // core modules.
 import {delay}                  from "./core/delay"
 import {dowhile}                from "./core/dowhile"
@@ -48,20 +42,7 @@ import {ITask, Task, TaskEvent} from "./core/task"
 import {timeout}                from "./core/timeout"
 import {trycatch}               from "./core/trycatch"
 
-// node modules
-import {append}                 from "./node/fs/append"
-import {concat}                 from "./node/fs/concat"
-import {copy}                   from "./node/fs/copy"
-import {drop}                   from "./node/fs/drop"
-import {watch}                  from "./node/watch"
-import {cli}                    from "./node/cli"
-import {shell}                  from "./node/shell"
-
 export {
-  /** common modules */
-  signature,
-  tabulate,
-
   /** core modules */
   delay,
   dowhile,
@@ -76,14 +57,5 @@ export {
   series,
   ITask, Task, TaskEvent,
   timeout,
-  trycatch,
-
-  /** node modules */
-  append,
-  concat,
-  copy,
-  drop,
-  watch,
-  cli,
-  shell
+  trycatch
 }

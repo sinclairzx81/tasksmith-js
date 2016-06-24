@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------
 
-amd-boot-loader - makes bundled AMD modules work in node.
+amd-boot-loader - makes bundled typescript AMD modules work in node.
 
 The MIT License (MIT)
 
@@ -26,114 +26,141 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-//---------------------------------------------
-// AMD boot loader.
-//---------------------------------------------
-//
-// Sometimes, it's convenient to be able to 
-// bundle a bunch of commonjs modules into a
-// single output, however, the tsc compiler 
-// provides no options for bundling cjs in 
-// this way, but it does support AMD 
-// bundling....
-//
-// "compilerOptions": {
-//     "module"  : "amd",
-//     "outFile" : "bundled.js"
-//  }
-//
-// If compiling with these options, the 
-// following script can be merged at the 
-// beginning of the bundled file to allow
-// it to be converted into a commonjs
-// module, for example...
-//
-// bundled.js
-//
-// [the boot loader]
-//
-// [the bundled AMD module]
-// 
-// module.exports = __collect()
-//
-//---------------------------------------------
-
-
-//---------------------------------------------
-// BEGIN: HEADER
-//---------------------------------------------
-
 declare var require: Function
 
-let __definitions = {}
-let __cached      = {
-    "require": (arg, callback) => callback( require (arg) ),
-    "exports": {}
+//--------------------------------------------------
+//
+// TypeScript bundled AMD loader for Node.
+//
+// This script is intended to wrap a amd bundle
+// produced by the typescript compiler. This would
+// include script generated with the following 
+// compiler options.
+//
+// tsc mymodule.ts --module amd --outFile mymodule.js
+//
+//---------------------------------------------------
+
+/**
+ * definition for modules located within this bundle,
+ * as well as a container for modules loaded via
+ * commonjs.
+ */
+interface Definition {
+    id           : string
+    dependencies : string[],
+    factory      : (...args: any[]) => any
 }
 
 /**
- * Resolves an AMD module.
+ * definition accumulator.
+ */
+let definitions:Definition[] = []
+
+/**
+ * resolves a module by its id. recursively loads its dependencies also.
  * @param {string} the name of the module.
+ * @param {cache} a cache to accumulator module exports.
+ * @returns {any}
+ */
+const resolve = (id: string, cache: {}) : any => {
+
+    /**
+     * special case:
+     * 
+     * The typescript compiler writes its
+     * exports on the exports dependency.
+     * In these scenarios, we return to the 
+     * dependant a empty object for it to
+     * write to. we collect it later.
+     */
+    if(id === "exports") return  {}
+
+    /**
+     * cache:
+     * 
+     * Some modules may be included more than 
+     * once in the bundle, this would result
+     * in the potential for cyclic referencing
+     * as well as initializing the same thing
+     * over and over. Check the cache and return
+     * if found.
+     */
+    if (cache[id] !== undefined)  return cache[id];
+
+    /**
+     * locate definition:
+     * 
+     * Here, we try and locate a definition within
+     * the bundle or, attempt to pull it back from
+     * nodes require(). In the node case, we wrap
+     * require in a definition for consistency.
+     */
+    let definition :Definition = (definitions.some(definition => definition.id === id)) 
+                               ? definitions.filter(definition => definition.id === id)[0] 
+                               : ({ id: id,  dependencies: [], factory: () => require(id) })         
+    /**
+     * dependencies:
+     * 
+     * before injecting the definition factory,
+     * we need to resolve its dependencies. This
+     * recursively calls back on itself to load
+     * the dependencies exports.
+     */
+    let dependencies = definition.dependencies.map(dependency => resolve(dependency, cache))
+
+    /**
+     * invoke:
+     * 
+     * invoke this definitions factory by passing its
+     * dependencies, store the result.
+     */
+    let exports = definition.factory.apply({}, dependencies)
+
+    /**
+     * typescript exports:
+     * 
+     * because typescript exports on its exports
+     * dependency, we need to extract the output
+     * from there instead.
+     */
+    if(definition.dependencies.some(dependency => dependency === "exports")) 
+        exports = dependencies[definition.dependencies.indexOf("exports")]
+
+    /** 
+     * cache this module, and return exports.
+     */
+    return cache[id] = exports
+}
+
+/**
+ * the collect function resolves definitions
+ * in the space and gives its exports. Note
+ * that we borrow on the typescript conventions
+ * of resolving from the last module in the bundle.
  * @returns {any} the modules exports.
  */
-const __resolve = (name) : any => {
-
-    // if resolving exports, return empty object
-    // for caller to populate.
-    if(name === "exports") return  {}
-    
-    // if module is cached, return it.
-    if (__cached[name] !== undefined) {
-        return __cached[name];
-    }
-    // if module amd definition exists, resolve it.
-    else if(__definitions[name] !== undefined) {
-        var args = __definitions[name].deps.map(name => __resolve(name));
-        __definitions[name].fn.apply({}, args);
-        return __cached[name] = args[__definitions[name].deps.indexOf("exports")];
-    }
-    // still not found, try require it...(unusual case)
-    else { return require(name) }
-}
+const collect = () => resolve(definitions[definitions.length - 1].id, { 
+   	    "require": (arg, callback) => callback( require (arg) ) 
+    })
 
 /**
- * Collects the AMD modules exports.
- * @param {string} the name of the module.
- * @returns {any} the modules exports.
- */
-const __collect = () : any => {
-    let ids = Object.keys(__definitions)
-    return __resolve(ids[ids.length - 1])
-}
-
-/**
- * The AMD define function.
- * @param {string} the name of the module.
- * @param {string[]} the names of dependencies.
- * @param {Function} the resolver function.
+ * The amd define function, called by each module in this bundle.
+ * @param {string} the id of the definition.
+ * @param {string[]} the dependencies for this definition.
+ * @param {Function} the definition factory.
  * @returns {void}
  */
-const define = (name, deps, fn) : void => {
-    __definitions[name] = { deps: deps, fn: fn }
-}
-//---------------------------------------------
-// END: HEADER
-//---------------------------------------------
+const define = (id: string, dependencies: string[], factory: (...args: any[]) => any) => 
+    definitions.push({ id: id, dependencies: dependencies, factory: factory })
 
 
 //---------------------------------------------
-// BUNDLED MODULE HERE..
+//
+// BUNDLED TYPESCRIPT AMD MODULE HERE.
+//
 //---------------------------------------------
 
-
-//---------------------------------------------
-// BEGIN: FOOTER
-//---------------------------------------------
-
-// module.exports = __collect()
-
-//---------------------------------------------
-// END: FOOTER
-//---------------------------------------------
+// module.exports = collect()
 
 
