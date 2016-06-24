@@ -85,8 +85,9 @@ export function shell(...args: any[]) : ITask {
 
   return script("node/shell", context => {
     if(param.message !== null) context.log(param.message)
-    const windows  = /^win/.test(process.platform)
-    let proc = spawn(windows ? 'cmd' : 'sh', [windows ? '/c':'-c', param.command])
+    context.log(param.command)
+    const windows = /^win/.test(process.platform)
+    const proc    = spawn(windows ? 'cmd' : 'sh', [windows ? '/c':'-c', param.command])
     proc.stdout.setEncoding("utf8")
     proc.stdout.on("data",  data  => context.log ("stdout:", data))
     proc.stderr.on("data",  data  => context.log ("stderr:", data))

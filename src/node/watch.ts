@@ -102,6 +102,6 @@ export function watch(...args: any[]) : ITask {
       }
     }
     if(param.immediate === true) runtask()
-    fs.watch(param.path, {recursive: true}, (event, filename) => runtask())
+    fs.watch(param.path, {recursive: true}, (event, filename) =>  runtask())
   })
 }

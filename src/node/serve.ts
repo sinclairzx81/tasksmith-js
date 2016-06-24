@@ -28,71 +28,79 @@ THE SOFTWARE.
 
 /// <reference path="./node.d.ts" />
 
-import * as http          from "http"
-import * as fs            from "fs"
-import * as path          from "path"
+
 import {signature}        from "../common/signature"
 import {ITask}            from "../core/task"
 import {script}           from "../core/script"
 
+import * as http          from "http"
+import * as fs            from "fs"
+import * as path          from "path"
+import * as url           from "url"
+
 /** 
- * the watch script.
+ * the signals script.
  * 
- * the follow script is injected into a page
- * when running in watch mode. The script
- * creates a comet connection to the 
- * watch server /__watch endpoint. 
- * Its purpose is to listen for "reload"
- * watch from the endpoint, these are
- * triggered by watch watch.
+ * the following script gets injected into
+ * html documents running in watch mode. 
+ * The script creates a long running chunked
+ * http request to the __signals endpoint. 
+ * Once connected, the client listens for
+ * incoming events from the serve server,
+ * and attempts to maintain the connection
+ * will retry on disconnect.
  * @returns {string} 
  */
-const watch_client_script = () => `
-<!-- BEGIN: WATCH SCRIPT -->
+const signals_client_script = () => `
+<!-- BEGIN: SIGNALS -->
 <script type="text/javascript">
-  window.addEventListener("load", function() {
-    var watch = function(callback) {
-    var xhr     = new XMLHttpRequest();
-    var idx     = 0;
+window.addEventListener("load", function() {
+  function connect(handler) {
+    var xhr = new XMLHttpRequest();
+    var idx = 0;
     xhr.addEventListener("readystatechange", function(event) {
       switch(xhr.readyState) {
-        case 4: callback("watch disconnected."); break;
+        case 4: handler("disconnect"); break;
         case 3:
-          var watch = xhr.response.substr(idx);
-          idx += watch.length;
-          callback(watch);
+          var signal = xhr.response.substr(idx);
+          idx += signal.length;
+          handler(signal);
           break;
       }
     });
-    xhr.open("GET", "/__watch", true); 
+    xhr.open("GET", "/__signals", true); 
     xhr.send();
   }
-  watch(function(signal) {
+  function handler(signal) {
     switch(signal) {
-      case "connect": console.log("watch: connected");  break;
-      case "reload":  window.location.reload();  break;
-      case "done":    console.log("watch: disconnected"); break;
+      case "established": console.log("signals: established");  break;
+      case "reload":      window.location.reload();  break;    
+      case "disconnect":
+        console.log("signals: disconnected");
+        setTimeout(function() {
+          console.log("signals: reconnecting...");
+          connect(handler)
+        }, 1000) 
+        break;
     }
-  });
-});</script>
-<!-- END: WATCH SCRIPT -->
-`.replace("\n", "")
- .replace("\t", "")
+  }
+  connect(handler)
+})
+</script>
+<!-- END: SIGNALS -->
+`
 
 /**
- * injects the watch client script into the 
- * html document, the script is injected at
- * the location of the closing html tag, if
- * not found, nothing is injected and the 
- * content is returned as is.
+ * injects the signals client script into a 
+ * html document. the script in injected at
+ * the end of the document.
  * @param {string} the content being injected
  * @returns {string} the injected content.
  */
-const inject_watch_script = (content: string) => {
-  let inject_index = content.indexOf("</html>")
-  if(inject_index === -1) return content
+const inject_signals_script = (content: string) => {
+  let inject_index  = content.length; // content.indexOf("</html>")
   let watch_prefix  = content.slice(0, inject_index)
-  let watch_content = watch_client_script()
+  let watch_content = signals_client_script()
   let watch_postfix = content.slice(inject_index)
   content = [
     watch_prefix, 
@@ -108,7 +116,28 @@ const inject_watch_script = (content: string) => {
  * @param {string} a message to log.
  * @param {string} the directory to serve.
  * @param {number} the port to serve this application on.
- * @param {boolean} should the task watch for content changes and live reload. default is false.
+ * @param {boolean} should the task watch for content changes and live reload. (default false)
+ * @param {number} suspends the reload signal for the given number of milliseconds. (default 0)
+ * @returns {ITask}
+ */
+export function serve(message: string, directory: string, port: number, watch: boolean, delay: number) : ITask
+
+/**
+ * creates a infinite task that serves a directory over http.
+ * @param {string} the directory to serve.
+ * @param {number} the port to serve this application on.
+ * @param {boolean} should the task watch for content changes and live reload. (default false)
+ * @param {number} suspends the reload signal for the given number of milliseconds. (default 0)
+ * @returns {ITask}
+ */
+export function serve(directory: string, port: number, watch: boolean, delay: number) : ITask
+
+/**
+ * creates a infinite task that serves a directory over http.
+ * @param {string} a message to log.
+ * @param {string} the directory to serve.
+ * @param {number} the port to serve this application on.
+ * @param {boolean} should the task watch for content changes and live reload. (default false)
  * @returns {ITask}
  */
 export function serve(message: string, directory: string, port: number, watch: boolean) : ITask
@@ -117,7 +146,7 @@ export function serve(message: string, directory: string, port: number, watch: b
  * creates a infinite task that serves a directory over http.
  * @param {string} the directory to serve.
  * @param {number} the port to serve this application on.
- * @param {boolean} should the task watch for content changes and live reload. default is false.
+ * @param {boolean} should the task watch for content changes and live reload. (default false)
  * @returns {ITask}
  */
 export function serve(directory: string, port: number, watch: boolean) : ITask
@@ -149,12 +178,15 @@ export function serve(...args: any[]) : ITask {
     message   : string,
     directory : string,
     port      : number,
-    watch     : boolean
+    watch     : boolean,
+    delay     : number,
   }>(args, [
-      { pattern: ["string", "string",  "number", "boolean"], map : (args) => ({ message: args[0], directory: args[1], port: args[2], watch: args[3]  })  },
-      { pattern: ["string", "number",  "boolean"],           map : (args) => ({ message: null,    directory: args[0], port: args[1], watch: args[2]  })  },
-      { pattern: ["string", "string",  "number"],            map : (args) => ({ message: args[0], directory: args[1], port: args[2], watch: false    })  },
-      { pattern: ["string", "number"],                       map : (args) => ({ message: null,    directory: args[0], port: args[1], watch: false    })  }
+      { pattern: ["string", "string",  "number",  "boolean", "number"], map : (args) => ({ message: args[0], directory: args[1], port: args[2], watch: args[3] , delay: args[4] })  },
+      { pattern: ["string", "number",  "boolean", "number"],            map : (args) => ({ message: null,    directory: args[0], port: args[1], watch: args[2] , delay: args[3] })  },
+      { pattern: ["string", "string",  "number",  "boolean"],           map : (args) => ({ message: args[0], directory: args[1], port: args[2], watch: args[3] , delay: 0       })  },
+      { pattern: ["string", "number",  "boolean"],                      map : (args) => ({ message: null,    directory: args[0], port: args[1], watch: args[2] , delay: 0       })  },
+      { pattern: ["string", "string",  "number"],                       map : (args) => ({ message: args[0], directory: args[1], port: args[2], watch: false   , delay: 0       })  },
+      { pattern: ["string", "number"],                                  map : (args) => ({ message: null,    directory: args[0], port: args[1], watch: false   , delay: 0       })  }
   ])
   return script("node/serve", context => {
     if(param.message !== null) context.log(param.message)
@@ -162,9 +194,8 @@ export function serve(...args: any[]) : ITask {
     /**
      * clients:
      * 
-     * A collection of clients. This collection
-     * is appended when a user-agent visits the
-     * /__watch endpoint.
+     * A collection of clients listening on
+     * the __signals endpoint.
      */
     let clients = []
 
@@ -172,7 +203,7 @@ export function serve(...args: any[]) : ITask {
      * ========================================================
      * directory watcher:
      * 
-     * if in watch mode, setup a recursive
+     * if in watch mode, we setup a recursive
      * watch on the given directory. When
      * we get a signal from the file system,
      * enumerate the clients array and dispatch
@@ -185,8 +216,12 @@ export function serve(...args: any[]) : ITask {
       fs.watch(param.directory, {recursive: true}, (event, filename) => {
         if(waiting_on_fs_watch === true) {
           waiting_on_fs_watch = false
-          clients.forEach(client => client("reload"))
-          setTimeout(() => {  waiting_on_fs_watch = true }, 100)
+          setTimeout(() => {
+            clients.forEach(client => client("reload"))
+            setTimeout(() => {  
+              waiting_on_fs_watch = true 
+            }, 100)
+          }, param.delay)
         }
       })
     }
@@ -201,15 +236,15 @@ export function serve(...args: any[]) : ITask {
       switch(request.url) {
         /**
          * ========================================================
-         * watch endpoint:
+         * signals endpoint:
          * 
-         * if a request comes in for the __watch
+         * if a request comes in for the __signals
          * endpoint, initialize a long running
          * comet request. clients hold onto this
          * request waiting for reload signals.
          * ========================================================
          */
-        case "/__watch": {
+        case "/__signals": {
 
           /**
            * format headers:
@@ -221,25 +256,25 @@ export function serve(...args: any[]) : ITask {
            * the browser to emit data immediately.
            * 
            * Everything else is standard in this setup,
-           * but we do emit a connect signal to the client
-           * to say hi.
+           * but we do emit a established signal to the 
+           * client to say hi.
            */
-          context.log("client connected.")
+          context.log("SIG: client connected.")
           response.setHeader('Connection', 'Transfer-Encoding');
           response.setHeader('Content-Type', 'text/html; charset=utf-8');
           response.setHeader('Transfer-Encoding', 'chunked');
-          response.write    ("connect")
+          response.write    ("established")
 
           /** 
            * client:
            * 
-           * A client in this servers instance is nothing
-           * more than a function which emits data to 
-           * the response. Once created, push it to the
-           * clients array.
+           * Each client contains consists of a single
+           * function which is used to emit a signal
+           * on its respective http response. we push
+           * this function into the clients array.
            */
           let client = (signal) => {
-            context.log(signal)
+            context.log("SIG: " + signal)
             response.write(signal) 
           }; clients.push(client)
           
@@ -249,14 +284,13 @@ export function serve(...args: any[]) : ITask {
            * we listen out on the raw tcp connection
            * for the "end" event. This is a reliable
            * indication that the client has indeed
-           * dropped. Remove client from client array
-           * on these events.
+           * dropped (except in IE). Remove client 
+           * from clients array.
            */
           let request_: any = request
           request_.connection.on("end", () => {
-            context.log("client dropped")
-            let index = clients.indexOf(client)
-            clients = clients.splice(index, 1)
+            context.log("SIG: client disconnected")
+            clients = clients.splice(clients.indexOf(client), 1)
           })
         } break;
 
@@ -281,7 +315,8 @@ export function serve(...args: any[]) : ITask {
            */
           let resolved = path.resolve("./", param.directory) + "\\"
           let safeurl  = request.url.replace(new RegExp("\\.\\.", 'g'), "");
-          let resource = path.join(resolved, safeurl)
+          let uri      = url.parse(safeurl)
+          let resource = path.join(resolved, uri.pathname)
           resource     = resource.replace(new RegExp("\\\\", 'g'), "/");
           if(resource.lastIndexOf("/") === (resource.length - 1))
             resource = resource + "index.html"
@@ -315,8 +350,7 @@ export function serve(...args: any[]) : ITask {
             /**
              * stat errors.
              * 
-             * probably a 404, return one just in 
-             * case, be more specific in future.
+             * probably a 404, return one for now.
              */
             if(err) {
               response.writeHead(404, { "Content-Type": "text/plain" })
@@ -327,23 +361,17 @@ export function serve(...args: any[]) : ITask {
             /**
              * directory serving:
              * 
-             * currently not supported...might
-             * look at this in future.
+             * currently not supported.
              */
             if(stat.isDirectory()) {
               response.writeHead(404, { "Content-Type": "text/plain" })
-              response.end("404 - not found", "utf-8") 
+              response.end("403 - forbidden", "utf-8") 
               return
             }
 
 
             /**
              * content type handling.
-             * 
-             * given the need to inject the watch content
-             * into html in watch mode, we load the full
-             * content of html documents for parsing 
-             * reasons, everything is streamed.
              */
             switch(content_type) {
 
@@ -351,14 +379,14 @@ export function serve(...args: any[]) : ITask {
                * html script injection:
                * 
                * if in watch mode, we need to inject
-               * the watch client script, the code
-               * below checks the watch and if so
-               * injects.
+               * the signals client script, the code
+               * below checks if we are in watch mode,
+               * and if so, injects the signals script.
                */
               case "text/html":
-                context.log(request.method + " - " + request.url)
+                context.log(request.method + ": " + request.url)
                 fs.readFile(resource, "utf8", (error, content) => {
-                    content = (param.watch === true) ? inject_watch_script(content) : content
+                    content = (param.watch === true) ? inject_signals_script(content) : content
                     response.writeHead(200, { "Content-Type": content_type });
                     response.end(content, "utf-8");
                 });
@@ -371,7 +399,7 @@ export function serve(...args: any[]) : ITask {
                * other types of media.
                */
               default:
-                context.log(request.method + " - " + request.url)
+                context.log(request.method + ": " + request.url)
                 let readstream = fs.createReadStream(resource)
                 readstream.pipe(response)
                 break;
