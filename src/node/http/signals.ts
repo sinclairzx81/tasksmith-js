@@ -100,7 +100,7 @@ const inject_watch_script = (content: string) => {
  * @param {boolean} a boolean indicating if we are running in watch mode.
  * @returns {Server} a instance of the watch server. 
  */
-export const createServer = (directory: string, watch: boolean, log: (...args: any[]) => void) => http.createServer((request, response) => {
+export const createServer = (directory: string, watch: boolean, log: (...args: any[]) => void) => {
   
   /**
    * listeners:
@@ -122,191 +122,193 @@ export const createServer = (directory: string, watch: boolean, log: (...args: a
    * a reload watch. This will cause all
    * connected clients to reconnect.
    */
+  let waiting_on_fs_watch = true
   if(watch === true) {
-    let waiting_on_fs_watch = true
     fs.watch(directory, {recursive: true}, (event, filename) => {
       if(waiting_on_fs_watch === true) {
         waiting_on_fs_watch = false
         listeners.forEach(listener => listener("reload"))
-        setTimeout(() => {  waiting_on_fs_watch = true }, 1000)
+        setTimeout(() => {  waiting_on_fs_watch = true }, 100)
       }
     })
   }
 
-  switch(request.url) {
-    /**
-     * watch comet endpoint:
-     * 
-     * if accessing this server on this endpoint,
-     * its a connection to the watch endpoint.
-     * here, we setup a comet endpoint and register
-     * a emit function to our listeners array.
-     */
-    case "/__watch": {
-
+  return http.createServer((request, response) => {
+    switch(request.url) {
       /**
-       * format headers:
+       * watch comet endpoint:
        * 
-       * note: browsers may choose to buffer data
-       * prior to emitting to the client. As a work
-       * around, the following sets the content-type
-       * as text/html (not text/plain) which seems
-       * to have the browser emit the data immedately.
-       * note, the transfer-encoding is chunked, standard
-       * stuff. we also emit connect to the browser to 
-       * say hi.
+       * if accessing this server on this endpoint,
+       * its a connection to the watch endpoint.
+       * here, we setup a comet endpoint and register
+       * a emit function to our listeners array.
        */
-      log("watch: client connected.")
-      response.setHeader('Connection', 'Transfer-Encoding');
-      response.setHeader('Content-Type', 'text/html; charset=utf-8');
-      response.setHeader('Transfer-Encoding', 'chunked');
-      response.write    ("connect")
+      case "/__watch": {
 
-      /** 
-       * listener:
-       * 
-       * here we create a emitter function. 
-       * this function is added to our listeners
-       * array.
-       */
-      let listener = (watch) => {
-        log("watch: emit " + watch)
-        response.write(watch) 
-      }; listeners.push(listener)
-      
-      /**
-       * drops:
-       * 
-       * we listen out on the raw tcp connection
-       * for the "end" event. This is a reliable
-       * watch that the client has indeed navigated
-       * away. We remove our listener. done.
-       */
-      let request_: any = request
-      request_.connection.on("end", () => {
-        log("watch: client dropped")
-        let index = listeners.indexOf(listener)
-        listeners = listeners.splice(index)
-      })   
-      break; 
-    }
+        /**
+         * format headers:
+         * 
+         * note: browsers may choose to buffer data
+         * prior to emitting to the client. As a work
+         * around, the following sets the content-type
+         * as text/html (not text/plain) which seems
+         * to have the browser emit the data immedately.
+         * note, the transfer-encoding is chunked, standard
+         * stuff. we also emit connect to the browser to 
+         * say hi.
+         */
+        log("watch: client connected.")
+        response.setHeader('Connection', 'Transfer-Encoding');
+        response.setHeader('Content-Type', 'text/html; charset=utf-8');
+        response.setHeader('Transfer-Encoding', 'chunked');
+        response.write    ("connect")
 
-    /**
-     * static handler:
-     * 
-     * A standard run of the mill static files
-     * handler, with the exception that, on watch
-     * mode, we inject the watch script into
-     * the document.
-     */
-    default: {
-
-      /**
-       * format resource path:
-       * 
-       * business as usual, here we make best attempts
-       * to sanitize the incoming url, with particular
-       * focus given to preventing the caller from escaping
-       * out of the served directory.
-       */
-      let resolved = path.resolve("./", directory) + "\\"
-      let safeurl  = request.url.replace(new RegExp("\\.\\.", 'g'), "");
-      let resource = path.join(resolved, safeurl)
-      resource     = resource.replace(new RegExp("\\\\", 'g'), "/");
-      if(resource.lastIndexOf("/") === (resource.length - 1))
-        resource = resource + "index.html"
-      resource = path.normalize(resource)
-
-      /**
-       * mine types:
-       * 
-       * We don't support all types of mime, but we do 
-       * the most common. The reason for this was to keep
-       * this script light. callers can add in additional
-       * mimes not listed here as they see fit.
-       */
-      var content_type = "application/octet-stream";
-      switch (path.extname(resource)) {
-          case ".js"   : content_type = "text/javascript";  break;
-          case ".css"  : content_type = "text/css";         break;
-          case ".json" : content_type = "application/json"; break;
-          case ".png"  : content_type = "image/png";        break;  
-          case ".jpeg" :    
-          case ".jpg"  : content_type = "image/jpg";        break;
-          case ".wav"  : content_type = "audio/wav";        break;
-          case ".mp4"  : content_type = "video/mp4";        break;
-          case ".mp3"  : content_type = "audio/mpeg";       break;
-          case ".htm":
-          case ".html": content_type  = "text/html";        break;
+        /** 
+         * listener:
+         * 
+         * here we create a emitter function. 
+         * this function is added to our listeners
+         * array.
+         */
+        let listener = (watch) => {
+          log("watch: emit " + watch)
+          response.write(watch) 
+        }; listeners.push(listener)
+        
+        /**
+         * drops:
+         * 
+         * we listen out on the raw tcp connection
+         * for the "end" event. This is a reliable
+         * watch that the client has indeed navigated
+         * away. We remove our listener. done.
+         */
+        let request_: any = request
+        request_.connection.on("end", () => {
+          log("watch: client dropped")
+          let index = listeners.indexOf(listener)
+          listeners = listeners.splice(index, 1)
+        })   
+        break; 
       }
 
-      fs.stat(resource, (err, stat) => {
+      /**
+       * static handler:
+       * 
+       * A standard run of the mill static files
+       * handler, with the exception that, on watch
+       * mode, we inject the watch script into
+       * the document.
+       */
+      default: {
 
         /**
-         * stat errors.
+         * format resource path:
          * 
-         * probably a 404, return one just in 
-         * case, be more specific in future.
+         * business as usual, here we make best attempts
+         * to sanitize the incoming url, with particular
+         * focus given to preventing the caller from escaping
+         * out of the served directory.
          */
-        if(err) {
-          response.writeHead(404, { "Content-Type": "text/plain" })
-          response.end("404 - not found", "utf-8") 
-          return
+        let resolved = path.resolve("./", directory) + "\\"
+        let safeurl  = request.url.replace(new RegExp("\\.\\.", 'g'), "");
+        let resource = path.join(resolved, safeurl)
+        resource     = resource.replace(new RegExp("\\\\", 'g'), "/");
+        if(resource.lastIndexOf("/") === (resource.length - 1))
+          resource = resource + "index.html"
+        resource = path.normalize(resource)
+
+        /**
+         * mine types:
+         * 
+         * We don't support all types of mime, but we do 
+         * the most common. The reason for this was to keep
+         * this script light. callers can add in additional
+         * mimes not listed here as they see fit.
+         */
+        var content_type = "application/octet-stream";
+        switch (path.extname(resource)) {
+            case ".js"   : content_type = "text/javascript";  break;
+            case ".css"  : content_type = "text/css";         break;
+            case ".json" : content_type = "application/json"; break;
+            case ".png"  : content_type = "image/png";        break;  
+            case ".jpeg" :    
+            case ".jpg"  : content_type = "image/jpg";        break;
+            case ".wav"  : content_type = "audio/wav";        break;
+            case ".mp4"  : content_type = "video/mp4";        break;
+            case ".mp3"  : content_type = "audio/mpeg";       break;
+            case ".htm":
+            case ".html": content_type  = "text/html";        break;
         }
 
-        /**
-         * directory serving:
-         * 
-         * currently not supported...might
-         * look at this in future.
-         */
-        if(stat.isDirectory()) {
-          response.writeHead(404, { "Content-Type": "text/plain" })
-          response.end("404 - not found", "utf-8") 
-          return
-        }
-
-
-        /**
-         * content type handling.
-         * 
-         * given the need to inject the watch content
-         * into html in watch mode, we load the full
-         * content of html documents for parsing 
-         * reasons, everything is streamed.
-         */
-        switch(content_type) {
+        fs.stat(resource, (err, stat) => {
 
           /**
-           * html script injection:
+           * stat errors.
            * 
-           * if in watch mode, we need to inject
-           * the watch client script, the code
-           * below checks the watch and if so
-           * injects.
+           * probably a 404, return one just in 
+           * case, be more specific in future.
            */
-          case "text/html":
-            log(request.method + " - " + request.url)
-            fs.readFile(resource, "utf8", (error, content) => {
-                content = (watch === true) ? inject_watch_script(content) : content
-                response.writeHead(200, { "Content-Type": content_type });
-                response.end(content, "utf-8");
-            });
-            break;
+          if(err) {
+            response.writeHead(404, { "Content-Type": "text/plain" })
+            response.end("404 - not found", "utf-8") 
+            return
+          }
+
           /**
-           * stream everything else.
+           * directory serving:
            * 
-           * everything else is streamed, this 
-           * should account for video, audio and
-           * other types of media.
+           * currently not supported...might
+           * look at this in future.
            */
-          default:
-            log(request.method + " - " + request.url)
-            let readstream = fs.createReadStream(resource)
-            readstream.pipe(response)
-            break;
-        }
-      })
-    }         
-  }
-})
+          if(stat.isDirectory()) {
+            response.writeHead(404, { "Content-Type": "text/plain" })
+            response.end("404 - not found", "utf-8") 
+            return
+          }
+
+
+          /**
+           * content type handling.
+           * 
+           * given the need to inject the watch content
+           * into html in watch mode, we load the full
+           * content of html documents for parsing 
+           * reasons, everything is streamed.
+           */
+          switch(content_type) {
+
+            /**
+             * html script injection:
+             * 
+             * if in watch mode, we need to inject
+             * the watch client script, the code
+             * below checks the watch and if so
+             * injects.
+             */
+            case "text/html":
+              log(request.method + " - " + request.url)
+              fs.readFile(resource, "utf8", (error, content) => {
+                  content = (watch === true) ? inject_watch_script(content) : content
+                  response.writeHead(200, { "Content-Type": content_type });
+                  response.end(content, "utf-8");
+              });
+              break;
+            /**
+             * stream everything else.
+             * 
+             * everything else is streamed, this 
+             * should account for video, audio and
+             * other types of media.
+             */
+            default:
+              log(request.method + " - " + request.url)
+              let readstream = fs.createReadStream(resource)
+              readstream.pipe(response)
+              break;
+          }
+        })
+      }         
+    }
+  })
+}
