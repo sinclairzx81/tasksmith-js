@@ -7,7 +7,7 @@ const task = require('./tasksmith.js')
 
 let mytask = () => task.series([
   task.shell("npm install"),
-  task.shell("node myapp.js")
+  task.shell("node app.js")
 ])
 
 mytask().run()
@@ -154,7 +154,9 @@ let mytask = () => task.retry(10, () => task.series([
 ```
 
 ### script
-creates a new script task.
+
+creates a new script task. This is the primary extension point for tasksmith.
+
 ```javascript
 let mytask = () => task.script("custom/task", context => {
   context.log("logging some info")
@@ -197,11 +199,53 @@ let mytask = () => task.trycatch (
 
 The following tasks are specific to node.
 
+### append
+
+creates a task that appends a file with the given content.
+
+```javascript
+let mytask = () => task.append( "./file.dat", "this content will be appended.")
+```
+
+### concat
+
+creates a task that concatinates multiple files to an output file.
+
+```javascript
+let mytask = () => task.concat( "./output.dat", ["file1.dat", "file2.dat", "file3.dat"])
+```
+
+### copy
+
+creates a task that recursively copies a file or directory into a target directory.
+
+```javascript
+let mytask = () => task.copy( "./file_or_directory", "./target_directory")
+```
+
+### drop
+
+creates a task that recursively deletes a file or directory.
+
+```javascript
+let mytask = () => task.drop( "./file_or_directory")
+```
+
+### serve
+
+creates a infinite task that serves static content for the given directory and provides live reload functionality.
+
+note: because this task never finishes, run with other tasks within a parallel task block.
+
+```javascript
+let mytask = () => task.serve("./website", 5000, true)
+```
+
 ### shell
 
 creates a task that executes a shell command.
 
-```js
+```javascript
 let mytask = () => task.shell("npm install typescipt")
 ```
 
@@ -209,34 +253,23 @@ let mytask = () => task.shell("npm install typescipt")
 
 creates a infinite task that repeats changes to the given file or directory path. 
 
-note: because this task never finishes, run within a parallel block.
+note: because this task never finishes, run with other tasks within a parallel task block.
 
-```js
+```javascript
 let mytask = () => task.parallel([
   task.watch("./file1.txt", () => task.ok("file1 changed")),
   task.watch("./folder1",   () => task.ok("folder1 changed"))
 ])
 ```
 
-### serve
-
-creates a infinite task that serves static content for the given directory. supports live reload.
-
-note: because this task never finishes, run within a parallel block.
-
-```js
-// (directory, port, watch)
-let mytask = () => task.serve("./", 5000, true)
-```
-
 ### cli
 
 creates a task that creates a simple cli to run tasks by name from the command line.
 
-```js
-// file: ./mytasks.js
-// info: starter template.
-const task = require("./tasksmith")
+the following is some example script for a task file named "mytasks.js".
+
+```javascript
+const task = require("./tasksmith.js")
 
 let clean    = () => task.ok("running clean task.")
 let install  = () => task.ok("running install task.")

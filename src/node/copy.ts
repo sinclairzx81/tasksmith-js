@@ -26,15 +26,17 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../../common/signature"
-import {ITask}     from "../../core/task"
-import {script}    from "../../core/script"
-import * as common from "./common"
+/// <reference path="./node.d.ts" />
+
+import {signature} from "../common/signature"
+import {ITask}     from "../core/task"
+import {script}    from "../core/script"
+import * as fsutil from "./fsutil"
 import * as path   from "path"
 import * as fs     from "fs"
 
 /**
- * creates a task that copies a file or directory to a target output directory.
+ * creates a task that recursively copies a file or directory into a target directory.
  * @param {string} a message to log.
  * @param {string} the source path of the file or directory to copy.
  * @param {string} the target directory path.
@@ -43,7 +45,7 @@ import * as fs     from "fs"
 export function copy(message: string, src: string, directory: string) : ITask
 
 /**
- * creates a task that copies a file or directory to a target output directory.
+ * creates a task that recursively copies a file or directory into a target directory.
  * @param {string} the source path of the file or directory to copy.
  * @param {string} the target directory path.
  * @returns {ITask}
@@ -51,7 +53,7 @@ export function copy(message: string, src: string, directory: string) : ITask
 export function copy(src: string, directory: string) : ITask
 
 /**
- * creates a task that copies a file or directory to a target output directory.
+ * creates a task that recursively copies a file or directory into a target directory.
  * @param {any[]} arguments.
  * @returns {ITask}
  */
@@ -65,33 +67,34 @@ export function copy(...args: any[]) : ITask {
       { pattern: ["string", "string"],           map : (args) => ({ message: null,    src: args[0], directory: args[1]  })  },
   ])
 
-  return script("node/fs/copy", context => {
+  return script("node/copy", context => {
     if(param.message !== null) context.log(param.message)
     try {
-      let src = common.fs_resolve_path(param.src)
-      let dst = common.fs_resolve_path(param.directory)
-      let dst_info = common.fs_info(dst)
-      let gather   = common.fs_tree(src)
+      let src = path.resolve(param.src)
+      let dst = path.resolve(param.directory)
+      let dst_info = fsutil.meta  (dst)
+      let gather   = fsutil.tree  (src)
       gather.forEach(src_info => {
         switch(src_info.type) {
-          case "invalid"   : throw common.fs_error("copy", "invalid file or directory src path.", src)
-          case "empty"     : throw common.fs_error("copy", "no file or directory exists at the given src.", src)
+          case "invalid"   : throw fsutil.error("copy", "invalid file or directory src path.", src)
+          case "empty"     : throw fsutil.error("copy", "no file or directory exists at the given src.", src)
           case "directory":
             let directory = path.join(dst_info.dirname, 
                                           dst_info.basename,
                                      	    src_info.relname)
-            context.log(common.fs_message("mkdir", [directory]))
-            common.fs_build_directory(directory)
+            context.log(fsutil.message("mkdir", [directory]))
+            fsutil.build_directory(directory)
             break;
           case "file":
             let source = path.join(src_info.dirname, src_info.basename)
             let target = path.join(dst_info.dirname, dst_info.basename,
                                    src_info.relname, src_info.basename)
-            context.log(common.fs_message("copy", [source, target]))
-            common.fs_copy_file(source, target)
+            context.log(fsutil.message("copy", [source, target]))
+            fsutil.copy_file(source, target)
             break;
         }
-      }); context.ok()
+      }); 
+      context.ok()
     } catch(error) {
       context.fail(error.message)
     }

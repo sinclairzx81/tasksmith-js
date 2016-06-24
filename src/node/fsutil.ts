@@ -26,12 +26,7 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-//--------------------------------------------------
-// file system and path abstraction, this file
-// is used by the other fs task operations.
-//
-// this file could use a refactoring.
-//--------------------------------------------------
+/// <reference path="./node.d.ts" />
 
 import * as path from "path"
 import * as fs   from "fs"
@@ -43,7 +38,7 @@ import * as fs   from "fs"
  * @param {string} the path causing the problem.
  * @returns {string}
  */
-export const fs_message = (context:string, args: string[]) => 
+export const message = (context:string, args: string[]) => 
    " - " + [context, args.join(" ")].join(": ")
 
 /**
@@ -53,25 +48,18 @@ export const fs_message = (context:string, args: string[]) =>
  * @param {string} the path causing the problem.
  * @returns {Error}
  */
-export const fs_error = (context:string, message:string, path:string) => 
+export const error = (context:string, message:string, path:string) => 
    new Error([context, message, path].join(": "))
-
-/**
- * resolves the given path.
- * @param {string} the path to resolve.
- * @returns {string}
- */
-export const fs_resolve_path = (p:string) => path.resolve(p)
 
 /**
  * interface representation for a file system entity.
  */
-export interface FsInfo {
-  type    : "invalid" | "empty" | "file" | "directory",
-  basename: string,
-  dirname : string,
-  relname : string,
-  stat    : fs.Stats
+export interface Meta {
+  type     : "invalid" | "empty" | "file" | "directory",
+  basename : string,
+  dirname  : string,
+  relname  : string,
+  stat     : fs.Stats
 }
 
 /**
@@ -80,7 +68,7 @@ export interface FsInfo {
  * @param {string} the path.
  * @returns {FsInfo}
  */
-export const fs_info = (src:string): FsInfo => {
+export const meta = (src:string): Meta => {
   let exists = fs.existsSync(src)
   let stat   = exists && fs.statSync(src)
   if(src === null || src === undefined) {
@@ -122,17 +110,17 @@ export const fs_info = (src:string): FsInfo => {
  * @param {string} the path to begin gathering.
  * @return {FsInfo[]}
  */
-export const fs_tree = (src:string): FsInfo[] => {
-  const src_info = fs_info(src)
+export const tree = (src:string): Meta[] => {
+  const src_info = meta(src)
   switch(src_info.type) {
-    case "invalid": throw fs_error("fs_tree", "src path is invalid.", src)
-    case "empty":   throw fs_error("fs_tree", "src exist doesn't exist.", src)
+    case "invalid": throw error("util: tree", "src path is invalid.", src)
+    case "empty":   throw error("util: tree", "src exist doesn't exist.", src)
     case "directory":  /* ok */ break 
     case "file":       /* ok */ break
   }
   let buffer = []
-  let seek = (src, rel) => {
-    let info = fs_info(src)
+  let seek   = (src, rel) => {
+    let info = meta(src)
     switch(info.type) {
       case "invalid": /* ignore */ break;
       case "empty":   /* ignore */ break;
@@ -158,15 +146,15 @@ export const fs_tree = (src:string): FsInfo[] => {
  * @param {string} the directory path to build.
  * @return {void}
  */
-export const fs_build_directory = (directory:string): void => {
-  const info = fs_info(directory)
+export const build_directory = (directory:string): void => {
+  const info = meta(directory)
   switch(info.type) {
     case "directory": /* do nothing*/ break;
-    case "invalid"  : throw fs_error("fs_build_directory", "directory path is invalid", directory)
-    case "file"     : throw fs_error("fs_build_directory", "directory path points to a file.", directory)
+    case "invalid"  : throw error("util: build-directory", "directory path is invalid", directory)
+    case "file"     : throw error("util: build-directory", "directory path points to a file.", directory)
     case "empty"    :
       let parent    = path.dirname(directory)
-      if(fs.existsSync(parent) === false) fs_build_directory(parent)
+      if(fs.existsSync(parent) === false) build_directory(parent)
       fs.mkdirSync(path.join(info.dirname, info.basename))
       break
   }
@@ -178,21 +166,21 @@ export const fs_build_directory = (directory:string): void => {
  * @param {string} the destination filename.
  * @return {Stream<string>}
  */
-export const fs_copy_file = (src:string, dst:string): void => {
-  const src_info = fs_info(src)
-  const dst_info = fs_info(dst)
+export const copy_file = (src: string, dst :string): void => {
+  const src_info = meta(src)
+  const dst_info = meta(dst)
   switch(src_info.type) {
-    case "empty":     throw fs_error("fs_copy_file", "src file path doesn't exist.",  src)
-    case "invalid":   throw fs_error("fs_copy_file", "src file path is invalid.",     src) 
-    case "directory": throw fs_error("fs_copy_file", "attempted to link a directory", src)
+    case "empty":     throw error("util: copy-file", "src file path doesn't exist.",  src)
+    case "invalid":   throw error("util: copy-file", "src file path is invalid.",     src) 
+    case "directory": throw error("util: copy-file", "attempted to link a directory", src)
     case "file": /* ok */ break;
   }
   switch(dst_info.type) {
-    case "directory": throw fs_error("fs_copy_file", "dst file path found directory named the same.", dst)
-    case "invalid":   throw fs_error("fs_copy_file", "dst file path is invalid.", dst) 
+    case "directory": throw error("util: copy-file", "dst file path found directory named the same.", dst)
+    case "invalid":   throw error("util: copy-file", "dst file path is invalid.", dst) 
     case "empty":
     case "file":
-        fs_build_directory(dst_info.dirname) 
+        build_directory(dst_info.dirname) 
         let source = path.join(src_info.dirname, src_info.basename)
         let target = path.join(dst_info.dirname, dst_info.basename)
         // if the source and destination are the same, do nothing.

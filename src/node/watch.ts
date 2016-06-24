@@ -26,12 +26,12 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-/// <reference path="./typings/node/node.d.ts" />
+/// <reference path="./node.d.ts" />
 
 import {signature}        from "../common/signature"
 import {ITask}            from "../core/task"
 import {script}           from "../core/script"
-import {watch as fswatch} from "fs"
+import * as fs            from "fs"
 
 
 /**
@@ -102,6 +102,6 @@ export function watch(...args: any[]) : ITask {
       }
     }
     if(param.immediate === true) runtask()
-    fswatch(param.path, {recursive: true}, (event, filename) => runtask())
+    fs.watch(param.path, {recursive: true}, (event, filename) => runtask())
   })
 }

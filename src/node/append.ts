@@ -26,9 +26,11 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../../common/signature"
-import {ITask}     from "../../core/task"
-import {script}    from "../../core/script"
+/// <reference path="./node.d.ts" />
+
+import {signature} from "../common/signature"
+import {ITask}     from "../core/task"
+import {script}    from "../core/script"
 import * as fs     from "fs"
 
 /**
@@ -59,10 +61,10 @@ export function append(...args: any[]) : ITask {
     target   : string,
     content  : string
   }>(args, [
-      { pattern: ["string", "string", "array"], map : (args) => ({ message: args[0], target: args[1], content: args[2]  })  },
-      { pattern: ["string", "array"],           map : (args) => ({ message: null,    target: args[0], content: args[1]  })  },
+      { pattern: ["string", "string", "string"], map : (args) => ({ message: args[0], target: args[1], content: args[2]  })  },
+      { pattern: ["string", "string"],           map : (args) => ({ message: null,    target: args[0], content: args[1]  })  },
   ])
-  return script("node/fs/append", context => {
+  return script("node/append", context => {
     if(param.message !== null) context.log(param.message)
     try {
        fs.writeFileSync(param.target, [ fs.readFileSync(param.target, "utf8"), param.content].join("\n"))
@@ -72,13 +74,3 @@ export function append(...args: any[]) : ITask {
     }
   })
 }
-
-/**
- * returns a task that appends the given text content to the destination file.
- * @param {string} the file being appended.
- * @param {string} the content to append.
- * @returns {ITask}
- */
-// export const append = (filename: string, content: string) => script("node/fs/append", context => {
-//   context.fail("not implemented")
-// })

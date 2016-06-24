@@ -26,49 +26,50 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../../common/signature"
-import {ITask}     from "../../core/task"
-import {script}    from "../../core/script"
-import * as path   from "path"
+/// <reference path="./node.d.ts" />
+
+import {signature} from "../common/signature"
+import {ITask}     from "../core/task"
+import {script}    from "../core/script"
 import * as fs     from "fs"
 
 /**
- * creates a task that concatinates a the given sources to a target output file.
+ * creates a task that concatinates multiple files to an output file.
  * @param {string} a message to log.
  * @param {string} the target file.
  * @param {string[]} the sources to concatinate.
  * @returns {ITask}
  */
-export function concat(message: string, target: string, sources: string[]) : ITask
+export function concat(message: string, outputFile: string, sources: string[]) : ITask
 
 /**
- * creates a task that concatinates a the given sources to a target output file.
+ * creates a task that concatinates multiple files to an output file.
  * @param {string} the target file.
  * @param {string[]} the sources to concatinate.
  * @returns {ITask}
  */
-export function concat(filename: string, target: string[]) : ITask
+export function concat(outputFile: string, sources: string[]) : ITask
 
 /**
- * creates a task that concatinates a the given sources to a target output file.
+ * creates a task that concatinates multiple files to an output file.
  * @param {any[]} arguments.
  * @returns {ITask}
  */
 export function concat(...args: any[]) : ITask {
   let param = signature<{
-    message  : string,
-    target   : string,
-    sources  : string[]
+    message    : string,
+    outputFile : string,
+    sources    : string[]
   }>(args, [
-      { pattern: ["string", "string", "array"], map : (args) => ({ message: args[0], target: args[1], sources: args[2]  })  },
-      { pattern: ["string", "array"],           map : (args) => ({ message: null,    target: args[0], sources: args[1]  })  },
+      { pattern: ["string", "string", "array"], map : (args) => ({ message: args[0], outputFile: args[1], sources: args[2]  })  },
+      { pattern: ["string", "array"],           map : (args) => ({ message: null,    outputFile: args[0], sources: args[1]  })  },
   ])
-  return script("node/fs/concat", context => {
+  return script("node/concat", context => {
     if(param.message !== null) context.log(param.message)
     try {
       let output = param.sources.map(file => fs.readFileSync(file, "utf8")).join("\n")
-     fs.writeFileSync(param.target, output)
-     context.ok()
+      fs.writeFileSync(param.outputFile, output)
+      context.ok()
     } catch(error) {
       context.fail(error.message)
     }

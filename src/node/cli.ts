@@ -26,7 +26,7 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-/// <reference path="./typings/node/node.d.ts" />
+/// <reference path="./node.d.ts" />
 
 import {ITask}  from "../core/task"
 import {script} from "../core/script"
