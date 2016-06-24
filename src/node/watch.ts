@@ -98,7 +98,7 @@ export function watch(...args: any[]) : ITask {
         let task    = param.taskfunc()
         context.run(task)
                .then(()     => {waiting_on_signal = true})
-               .catch(error => context.fail(error.message))
+               .catch(error => context.fail(error))
       }
     }
     if(param.immediate === true) runtask()

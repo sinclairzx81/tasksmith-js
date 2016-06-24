@@ -5,12 +5,12 @@
 ```js
 const task = require('./tasksmith.js')
 
-let mytask = task.series([
+let mytask = () => task.series([
   task.shell("npm install"),
   task.shell("node myapp.js")
 ])
 
-mytask.run()
+mytask().run()
 ```
 
 ## overview
@@ -74,7 +74,7 @@ run from within any javascript environment.
 creates a task that will delay for the given number of milliseconds.
 
 ```javascript
-let mytask = task.series([
+let mytask = () => task.series([
   task.delay("waiting 1 second", 1000),
   task.delay("waiting 1 second", 1000),
   task.delay("waiting 1 second", 1000)
@@ -84,7 +84,7 @@ let mytask = task.series([
 ### dowhile
 creates a task that repeats while a condition is true.
 ```javascript
-let dowhile = task.dowhile(next => next(true), () => task.series([
+let mytask = () => task.dowhile(next => next(true), () => task.series([
    task.ok("running 1"),
    task.ok("running 2"),
    task.ok("running 3")
@@ -104,7 +104,7 @@ let mytask = () => task.series([
 ### ifelse
 creates a task that executes either left or right based on a condition.
 ```javascript
-let mytask = task.ifelse(
+let mytask = () => task.ifelse(
     next => next(true), 
     () => task.ok  ("running left"), 
     () => task.fail("running right"))
@@ -112,9 +112,9 @@ let mytask = task.ifelse(
 ### ifthen
 creates a task that will run a inner task if a condition is true. otherwise ok.
 ```javascript
-let mytask = task.ifthen(
+let mytask = () => task.ifthen(
     next => next(true), 
-    () => task.ok ("only if true"))
+    ()   => task.ok ("only if true"))
 ```
 ### ok
 returns a task that completes successfully.
@@ -134,10 +134,22 @@ let mytask = () => task.parallel([
 ### repeat
 creates a task that repeats the given task for the given number of iterations.
 ```javascript
-let mytask = task.repeat(10, (i) => task.series([
+let mytask = () => task.repeat(10, (i) => task.series([
   task.ok(i + " -> 1 "),
   task.ok(i + " -> 2 "),
   task.ok(i + " -> 3 ")
+]))
+```
+
+### retry
+
+creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
+
+```javascript
+let mytask = () => task.retry(10, () => task.series([
+  task.ok(),
+  task.ok(),
+  task.fail()
 ]))
 ```
 
@@ -165,7 +177,7 @@ let mytask = () => task.series([
 creates a task that will fail if its inner task has not 
 completed within the given number of milliseconds.
 ```javascript
-let mytask = task.timeout(3000, () => task.series([
+let mytask = () => task.timeout(3000, () => task.series([
   task.delay(1000),
   task.delay(1000),
   task.delay(1000), // !!!
@@ -177,7 +189,7 @@ let mytask = task.timeout(3000, () => task.series([
 ### trycatch
 creates a task that will try the left task, and if fail, will fallback to the right task.
 ```javascript
-let mytask = task.trycatch(
+let mytask = () => task.trycatch (
     () => task.fail ("this task will fail."),
     () => task.ok   ("so fallback to this task."))
 ```
@@ -190,7 +202,7 @@ The following tasks are specific to node.
 creates a task that executes a shell command.
 
 ```js
-let mytask = task.shell("npm install typescipt")
+let mytask = () => task.shell("npm install typescipt")
 ```
 
 ### watch
@@ -200,7 +212,7 @@ creates a infinite task that repeats changes to the given file or directory path
 note: because this task never finishes, run within a parallel block.
 
 ```js
-let mytask = task.parallel([
+let mytask = () => task.parallel([
   task.watch("./file1.txt", () => task.ok("file1 changed")),
   task.watch("./folder1",   () => task.ok("folder1 changed"))
 ])
@@ -213,7 +225,7 @@ creates a task that creates a simple cli to run tasks by name from the command l
 ```js
 // file: ./mytasks.js
 // info: starter template.
-const task  = require("./tasksmith")
+const task = require("./tasksmith")
 
 let clean    = () => task.ok("running clean task.")
 let install  = () => task.ok("running install task.")
@@ -221,7 +233,7 @@ let watch    = () => task.ok("running watch task.")
 let build    = () => task.ok("running build task.")
 let publish  = () => task.ok("running publish task.")
 
-let cli = task.cli(process.argv, {
+let cli = () => task.cli(process.argv, {
   "clean"   : clean(),
   "install" : install(),
   "watch"   : watch(),
@@ -229,7 +241,7 @@ let cli = task.cli(process.argv, {
   "publish" : publish()
 })
 
-cli.subscribe(event => {
+cli().subscribe(event => {
   console.log(task.format(event))
 }).run()
 ```

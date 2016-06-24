@@ -88,7 +88,7 @@ export function ifthen (...args:any []): ITask {
         let task = param.taskfunc()
         context.run(task)
                .then(()     => context.ok())
-               .catch(error => context.fail(error.message))
+               .catch(error => context.fail(error))
       }
     })
  })

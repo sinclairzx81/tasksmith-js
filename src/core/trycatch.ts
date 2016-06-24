@@ -73,7 +73,7 @@ export function trycatch(...args: any[]) : ITask {
         .catch(error => {
           context.run(param.right())
                  .then(()     => context.ok())
-                 .catch(error => context.fail(error.message))
+                 .catch(error => context.fail(error))
         })
   })
 }

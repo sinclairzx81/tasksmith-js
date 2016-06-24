@@ -77,7 +77,7 @@ export function repeat(...args: any[]): ITask {
         iteration += 1
         context.run( param.taskfunc(iteration) )
               .then(()     => next())
-              .catch(error => context.fail(error.message))
+              .catch(error => context.fail(error))
       }
     }; next()    
   })

@@ -25,23 +25,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
-
+import {Promise}   from "../common/promise"
 import {signature} from "../common/signature"
 import {ITask}     from "./task"
 import {script}    from "./script"
-
-//-------------------------------------------------
-// ES6 promise definition, required due to bundled
-// AMD compilation target. remove in future.
-// ------------------------------------------------
-export declare class Promise<T> {
-  constructor(resolve: (resolve: (value:T)      => void, 
-                        reject:  (error: Error) => void) 
-                        => void)
-  public then<S> (func: (value: T)     => S): Promise<S>
-  public catch<S>(func: (error: Error) => S): Promise<S> 
-  public static all<T>(arr: Promise<T>[]): Promise<T>
-}
 
 /**
  * creates a task that runs its inner tasks in parallel.
@@ -80,8 +67,9 @@ export function parallel (...args: any[]) {
   ])
   return script("core/parallel", context => {
     if(param.message !== null) context.log(param.message)
-    Promise.all(param.tasks.map(task => context.run(task)))
+    let thenables = param.tasks.map(task => context.run(task))
+    Promise.all(thenables)
             .then (()    => context.ok())
-            .catch(error => context.fail(error.message))
+            .catch(error => context.fail(error))
   })
 }

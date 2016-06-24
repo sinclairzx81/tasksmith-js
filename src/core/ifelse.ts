@@ -87,7 +87,7 @@ export function ifelse(...args: any[]) : ITask {
       let task = (result) ? param.left(): param.right()
       context.run(task)
              .then(()     => context.ok() )
-             .catch(error => context.fail(error.message))
+             .catch(error => context.fail(error))
     })
   })
 }

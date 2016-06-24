@@ -36,6 +36,7 @@ import {ifthen}                 from "./core/ifthen"
 import {ok}                     from "./core/ok"
 import {parallel}               from "./core/parallel"
 import {repeat}                 from "./core/repeat"
+import {retry}                  from "./core/retry"
 import {script}                 from "./core/script"
 import {series}                 from "./core/series"
 import {ITask, Task, TaskEvent} from "./core/task"
@@ -53,6 +54,7 @@ export {
   ok,
   parallel,
   repeat,
+  retry,
   script,
   series,
   ITask, Task, TaskEvent,

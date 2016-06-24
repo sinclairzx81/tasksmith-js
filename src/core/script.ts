@@ -26,22 +26,9 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature}          from "../common/signature"
+import {Promise}                from "../common/promise"
+import {signature}              from "../common/signature"
 import {ITask, Task, TaskEvent} from "./task"
-
-//-------------------------------------------------
-// ES6 promise definition, required due to bundled
-// AMD compilation target. remove in future.
-// ------------------------------------------------
-
-export declare class Promise<T> {
-  constructor(resolve: (resolve: (value:T)      => void, 
-                        reject:  (error: Error) => void) 
-                        => void)
-  public then<S> (func: (value: T)     => S): Promise<S>
-  public catch<S>(func: (error: Error) => S): Promise<S> 
-  public static all<T>(arr: Promise<T>[]): Promise<T>
-}
 
 /** 
  * specialized string formatter for variable length argument 

@@ -31,65 +31,54 @@ import {ITask}     from "./task"
 import {script}    from "./script"
 
 /**
- * a next function, passed to resolve to asynchronously resolve values.
- */
-export interface NextFunction<T> {
-  (value: T) : void
-}
-
-/**
- * a resolve function used for asynchronous resolution of values.
- */
-export interface ResolveFunction<T> {
-  (next: NextFunction<T>): void
-}
-
-/**
- * creates a task that repeats while a condition is true.
+ * creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
  * @param {string} a message to log.
- * @param {ResolveFunction<boolean>} a function to asynchronously resolve a boolean.
+ * @param {number} the number of retries.
  * @param {() => ITask} a function to return a new task on each iteration.
- * @returns {ITask} 
+ * @returns {ITask}
  */
-export function dowhile(message: string, condition: ResolveFunction<boolean>, taskfunc: () => ITask) : ITask
+export function retry(message: string, retries: number, taskfunc: (iteration: number) => ITask) : ITask 
 
 /**
- * creates a task that repeats while a condition is true.
- * @param {ResolveFunction<boolean>} a function to asynchronously resolve a boolean.
+ * creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
+ * @param {number} the number of retries.
  * @param {() => ITask} a function to return a new task on each iteration.
- * @returns {ITask} 
+ * @returns {ITask}
  */
-export function dowhile(condition: ResolveFunction<boolean>, taskfunc: () => ITask) : ITask
+export function retry(retries: number, taskfunc: (iteration: number) => ITask) : ITask 
 
 /**
- * creates a task that repeats while a condition is true.
- * @param {any[]} arguments.
+ * creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
+ * @param {any[]} arguments
  * @returns {ITask}
  * @example
  * 
- * let mytask = () => task.series([
- *   task.ok("1"),
- *   task.ok("2"),
- *   task.ok("3")
- * ])
- *
- * let dowhile = task.dowhile(next => next(true), mytask)
+ * let mytask = task.retry(10, (i) => task.series([
+ *   task.ok  (i + " -> 1 "),
+ *   task.ok  (i + " -> 2 "),
+ *   task.fail(i + " -> 3 ")
+ * ]))
  */
-export function dowhile (...args: any[]) : ITask {
+export function retry(...args: any[]): ITask {
   let param = signature<{
-    message   : string,
-    condition : ResolveFunction<boolean>
-    taskfunc  : () => ITask
+    message    : string,
+    retries    : number,
+    taskfunc   : (iteration: number) => ITask
   }>(args, [
-      { pattern: ["string", "function", "function"], map : (args) => ({ message: args[0], condition: args[1], taskfunc: args[2]  })  },
-      { pattern: ["function", "function"],           map : (args) => ({ message: null,    condition: args[0], taskfunc: args[1]  })  },
+      { pattern: ["string", "number", "function"], map : (args) => ({ message: args[0], retries: args[1], taskfunc: args[2]  })  },
+      { pattern: ["number", "function"],           map : (args) => ({ message: null,    retries: args[0], taskfunc: args[1]  })  },
   ])
-  return script("core/dowhile", context => {
+  return script("core/retry", context => {
     if(param.message !== null) context.log(param.message)
+    let iteration = 0
     const next = () => {
-      context.run(param.taskfunc())
-            .then(()     => param.condition(result => (result) ? next() : context.ok() ))
-            .catch(error => context.fail(error))
-    }; next()
+      if(iteration === param.retries) { context.fail(); }
+      else {
+        iteration += 1
+        context.run( param.taskfunc(iteration) )
+              .then(()     => context.ok())
+              .catch(error => next())
+      }
+    }; next()    
   })
 }

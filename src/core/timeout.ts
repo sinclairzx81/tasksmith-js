@@ -78,6 +78,6 @@ export function timeout(...args: any[]): ITask {
     const timeout = setTimeout(() => context.fail("timeout elapsed."), param.ms)
     context.run(param.taskfunc())
           .then(()     => context.ok())
-          .catch(error => context.fail(error.message))
+          .catch(error => context.fail(error))
   })
 }

@@ -26,20 +26,7 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-//-------------------------------------------------
-// ES6 promise definition, required due to bundled
-// AMD compilation target. remove in future.
-// ------------------------------------------------
-export declare class Promise<T> {
-  constructor(resolve: (resolve: (value:T)      => void, 
-                        reject:  (error: Error) => void) 
-                        => void)
-  public then<S> (func: (value: T)     => S): Promise<S>
-  public catch<S>(func: (error: Error) => S): Promise<S> 
-  public static all<T>(arr: Promise<T>[]): Promise<T>
-}
-
-
+import {Promise} from "../common/promise"
 
 /** TaskEvent: The interface for events emitted from Tasks in flight. */
 export interface TaskEvent {
@@ -111,9 +98,9 @@ export class Task implements ITask {
    */
   public run(): Promise<string> {
     if(this.state !== "pending") {
-      return new Promise((_, reject) => reject(Error("this task has already started.")))
+      return new Promise<string>((_, reject) => reject("this task has already started."))
     } else {
-      return new Promise((resolve, reject) => {
+      return new Promise<string>((resolve, reject) => {
         try {
           this.state = "running"
           this.subscribers.forEach(subscriber => subscriber({
@@ -149,7 +136,7 @@ export class Task implements ITask {
                   this.subscribers.forEach(subscriber => subscriber(event))
                   if(event.id === this.id) {
                     this.state = "failed"
-                    reject(new Error(event.data))
+                    reject(event.data)
                   }
                 }
                 break;

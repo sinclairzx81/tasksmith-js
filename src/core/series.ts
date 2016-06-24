@@ -72,7 +72,7 @@ export function series (...args: any[]) : ITask {
       else {
        context.run(param.tasks.shift())
               .then(next)
-              .catch(error => context.fail(error.message))
+              .catch(error => context.fail(error))
       }
     }; next()
   })
