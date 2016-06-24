@@ -251,15 +251,12 @@ let mytask = () => task.shell("npm install typescipt")
 
 ### watch
 
-creates a infinite task that repeats changes to the given file or directory path. 
+creates a infinite task that runs its inner task on file system changes.
 
 note: because this task never finishes, run with other tasks within a parallel task block.
 
 ```javascript
-let mytask = () => task.parallel([
-  task.watch("./file1.txt", () => task.ok("file1 changed")),
-  task.watch("./folder1",   () => task.ok("folder1 changed"))
-])
+let mytask = () => task.watch("./website", () => task.ok("something changed."))
 ```
 
 ### cli
