@@ -33,7 +33,6 @@ import {ITask}            from "../core/task"
 import {script}           from "../core/script"
 import {createServer}     from "./http/signals"
 
-
 /**
  * creates a infinite task that serves a directory over http.
  * @param {string} a message to log.

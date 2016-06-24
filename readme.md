@@ -21,7 +21,7 @@ script sophiticated workflows by composing them from smaller reusable tasks.
 ## building from source
 ```
 npm install typescript -g
-node tasks build
+node tasks build-all
 ```
 ## running tasks
 
@@ -156,7 +156,7 @@ let mytask = () => task.retry(10, () => task.series([
 ### script
 creates a new script task.
 ```javascript
-let mytask = task.script("custom/task", context => {
+let mytask = () => task.script("custom/task", context => {
   context.log("logging some info")
   context.ok()
   // or .. context.fail()
@@ -216,6 +216,17 @@ let mytask = () => task.parallel([
   task.watch("./file1.txt", () => task.ok("file1 changed")),
   task.watch("./folder1",   () => task.ok("folder1 changed"))
 ])
+```
+
+### serve
+
+creates a infinite task that serves static content for the given directory. supports live reload.
+
+note: because this task never finishes, run within a parallel block.
+
+```js
+// (directory, port, watch)
+let mytask = () => task.serve("./", 5000, true)
 ```
 
 ### cli
