@@ -49,9 +49,8 @@ const format_arguments = (args: any[]) : string => {
  * TaskCancellation:
  * 
  * A task cancellation token. Can optionally be
- * passed to tasks at created, otherwise, a internal
- * cancellation object will be created withing the
- * task for callers to cancel on the task directly.
+ * passed to tasks at creation, otherwise, an internal
+ * cancellation object will be created. 
  */
 export class TaskCancellation {
   private state      : "active" | "cancelled"
@@ -92,17 +91,16 @@ export class TaskCancellation {
  * 
  * As tasks execute, they emit events. Examples
  * include state transitions, logging and the 
- * end state of the task. These are signalled
- * with the given event type.
+ * end state of the task.
  */
 export interface TaskEvent {
   /** the unique identity of this task. */
   id   : string
   /** the name given to this task */
   name : string 
-  /** the time in which this event was signalled. */
+  /** the time in which this event was created. */
   time : Date
-  /** the type of event being signalled. */
+  /** the type of event being emitted. */
   type : string
   /** any data associated with this event. */
   data : string
@@ -132,7 +130,7 @@ export interface TaskExecutor {
 /**
  * TaskContext:
  * 
- * Given to executing tasks to fulfil their requirements.
+ * Given to executing tasks.
  */
 export interface TaskContext {
 
@@ -149,20 +147,20 @@ export interface TaskContext {
    * @returns {void}
    */
   log      : ( ...args: any[]) => void
+
   /**
    * sets this task as completed.
    * @param {...args:any[]} the arguments to log.
    * @returns {void}
    */
   ok       : ( ...args: any[]) => void
+
   /**
    * sets this task as failed.
    * @param {string} the reason why this task has failed.
    * @returns {void}
    */
   fail     : ( ...args: any[]) => void
-
-
 
   /**
    * a callback the inner context and listen on for external
