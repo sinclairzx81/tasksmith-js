@@ -32,15 +32,6 @@ import {script}    from "./script"
 
 /**
  * creates a task that repeats the given task for the given number of iterations.
- * @param {string} a message to log.
- * @param {number} the number of iterations.
- * @param {() => ITask} a function to return a new task on each iteration.
- * @returns {ITask}
- */
-export function repeat(message: string, iterations: number, taskfunc: (iteration: number) => ITask) : ITask 
-
-/**
- * creates a task that repeats the given task for the given number of iterations.
  * @param {number} the number of iterations.
  * @param {() => ITask} a function to return a new task on each iteration.
  * @returns {ITask}
@@ -61,12 +52,10 @@ export function repeat(iterations: number, taskfunc: (iteration: number) => ITas
  */
 export function repeat(...args: any[]): ITask {
   let param = signature<{
-    message    : string,
     iterations : number,
     taskfunc   : (iteration: number) => ITask
   }>(args, [
-      { pattern: ["string", "number", "function"], map : (args) => ({ message: args[0], iterations: args[1], taskfunc: args[2]  })  },
-      { pattern: ["number", "function"],           map : (args) => ({ message: null,    iterations: args[0], taskfunc: args[1]  })  },
+      { pattern: ["number", "function"],  map : (args) => ({ iterations: args[0], taskfunc: args[1]  })  },
   ])
   return script("core/repeat", context => {
     let iteration : number  = 0

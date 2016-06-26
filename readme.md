@@ -106,8 +106,8 @@ creates a task that executes either left or right based on a condition.
 ```javascript
 let mytask = () => task.ifelse(
     next => next(true), 
-    () => task.ok  ("running left"), 
-    () => task.fail("running right"))
+    ()   => task.ok  ("running left"), 
+    ()   => task.fail("running right"))
 ```
 ### ifthen
 creates a task that will run a inner task if a condition is true. otherwise ok.
@@ -125,25 +125,23 @@ let mytask = task.ok()
 ### parallel
 creates a task that runs its inner tasks in parallel.
 ```javascript
+// run concurrently
 let mytask = () => task.parallel([
-  task.delay("running 1", 1000),
-  task.delay("running 2", 1000),
-  task.delay("running 3", 1000),
+  task.delay(1000), 
+  task.delay(1000),
+  task.delay(1000)
 ])
+
 ```
 ### repeat
 creates a task that repeats the given task for the given number of iterations.
 ```javascript
-let mytask = () => task.repeat(10, (i) => task.series([
-  task.ok(i + " -> 1 "),
-  task.ok(i + " -> 2 "),
-  task.ok(i + " -> 3 ")
-]))
+let mytask = () => task.repeat(10, () => task.ok())
 ```
 
 ### retry
 
-creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
+creates a retry task that attempts the inner task for the given number of retries and fail if unable to complete.
 
 ```javascript
 let mytask = () => task.retry(10, () => task.series([
@@ -168,10 +166,11 @@ let mytask = () => task.script("custom/task", context => {
 ### series
 creates a task that runs its inner tasks in series.
 ```javascript
+// run sequentially.
 let mytask = () => task.series([
-  task.delay("running 1", 1000),
-  task.delay("running 2", 1000),
-  task.delay("running 3", 1000)
+  task.delay(1000),
+  task.delay(1000),
+  task.delay(1000)
 ])
 ```
 
