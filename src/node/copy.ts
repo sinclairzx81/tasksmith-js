@@ -37,20 +37,11 @@ import * as fs     from "fs"
 
 /**
  * creates a task that recursively copies a file or directory into a target directory.
- * @param {string} a message to log.
  * @param {string} the source path of the file or directory to copy.
  * @param {string} the target directory path.
  * @returns {ITask}
  */
-export function copy(message: string, src: string, directory: string) : ITask
-
-/**
- * creates a task that recursively copies a file or directory into a target directory.
- * @param {string} the source path of the file or directory to copy.
- * @param {string} the target directory path.
- * @returns {ITask}
- */
-export function copy(src: string, directory: string) : ITask
+export function copy(source_file_or_directory: string, target_directory: string) : ITask
 
 /**
  * creates a task that recursively copies a file or directory into a target directory.
@@ -59,19 +50,15 @@ export function copy(src: string, directory: string) : ITask
  */
 export function copy(...args: any[]) : ITask {
   let param = signature<{
-    message    : string,
-    src        : string,
-    directory  : string
+    source_file_or_directory: string,
+    target_directory        : string
   }>(args, [
-      { pattern: ["string", "string", "string"], map : (args) => ({ message: args[0], src: args[1], directory: args[2]  })  },
-      { pattern: ["string", "string"],           map : (args) => ({ message: null,    src: args[0], directory: args[1]  })  },
+    { pattern: ["string", "string"], map: (args) => ({ source_file_or_directory: args[0], target_directory: args[1]  })  },
   ])
-
   return script("node/copy", context => {
-    if(param.message !== null) context.log(param.message)
     try {
-      let src = path.resolve(param.src)
-      let dst = path.resolve(param.directory)
+      let src = path.resolve(param.source_file_or_directory)
+      let dst = path.resolve(param.target_directory)
       let dst_info = fsutil.meta  (dst)
       let gather   = fsutil.tree  (src)
       gather.forEach(src_info => {

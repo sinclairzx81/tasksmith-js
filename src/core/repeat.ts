@@ -69,15 +69,13 @@ export function repeat(...args: any[]): ITask {
 
     const next = () => {
       if(cancelled === true) return
-
       if(iteration === param.iterations) { 
         context.ok()
         return
       }
-
-      if(task !== null) task.cancel()
-
+      
       iteration += 1
+      if(task !== null) task.cancel()
       task = param.taskfunc(iteration)
       task.subscribe(event => context.emit(event))
           .run  ()

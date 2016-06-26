@@ -72,20 +72,16 @@ export function ifelse(...args: any[]) : ITask {
       { pattern: ["function", "function", "function"],  map: (args) => ({ condition: args[0], left: args[1], right: args[2]  })  },
   ])
   return script("core/ifelse", context => {
-
     let task      : ITask    = null
     let cancelled : boolean  = false
-
     context.oncancel(reason => {
       cancelled = true
       if(task !== null) task.cancel(reason)
       context.fail(reason)
-      
     })
-
+    
     param.condition(result => {
       if(cancelled === true) return
-
       task = (result) ? param.left() : param.right()
       task.subscribe(event => context.emit(event))
           .run   ()

@@ -64,12 +64,11 @@ export function series (...args: any[]) : ITask {
     })
     const next = () => {
       if(cancelled === true) return
-
       if (param.tasks.length === 0) {
         context.ok()
         return
       }
-
+      
       task = param.tasks.shift()
       task.subscribe(event => context.emit(event))
           .run      ()

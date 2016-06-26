@@ -35,15 +35,6 @@ import * as fs     from "fs"
 
 /**
  * creates a task that concatinates multiple files to an output file.
- * @param {string} a message to log.
- * @param {string} the target file.
- * @param {string[]} the sources to concatinate.
- * @returns {ITask}
- */
-export function concat(message: string, outputFile: string, sources: string[]) : ITask
-
-/**
- * creates a task that concatinates multiple files to an output file.
  * @param {string} the target file.
  * @param {string[]} the sources to concatinate.
  * @returns {ITask}
@@ -57,18 +48,15 @@ export function concat(outputFile: string, sources: string[]) : ITask
  */
 export function concat(...args: any[]) : ITask {
   let param = signature<{
-    message    : string,
     outputFile : string,
     sources    : string[]
   }>(args, [
-      { pattern: ["string", "string", "array"], map : (args) => ({ message: args[0], outputFile: args[1], sources: args[2]  })  },
-      { pattern: ["string", "array"],           map : (args) => ({ message: null,    outputFile: args[0], sources: args[1]  })  },
+      { pattern: ["string", "array"], map: (args) => ({ outputFile: args[0], sources: args[1]  })  },
   ])
   return script("node/concat", context => {
-    if(param.message !== null) context.log(param.message)
     try {
-      let output = param.sources.map(file => fs.readFileSync(file, "utf8")).join("\n")
-      fs.writeFileSync(param.outputFile, output)
+      let content = param.sources.map(file => fs.readFileSync(file, "utf8")).join("\n")
+      fs.writeFileSync(param.outputFile, content)
       context.ok()
     } catch(error) {
       context.fail(error.message)

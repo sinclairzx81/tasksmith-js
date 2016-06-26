@@ -63,17 +63,14 @@ export function dowhile (...args: any[]) : ITask {
   return script("core/dowhile", context => {
     let task     : ITask   = null
     let cancelled: boolean = false
-
     context.oncancel(reason => {
       cancelled = true
       if(task !== null) task.cancel(reason)
       context.fail(reason)
-
     })
 
     const next = () => {
       if(cancelled === true) return
-      
       task = param.taskfunc()
       task.subscribe(event => context.emit(event))
           .run()

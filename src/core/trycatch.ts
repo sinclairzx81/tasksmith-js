@@ -64,8 +64,8 @@ export function trycatch(...args: any[]) : ITask {
       if(left  !== null) left.cancel  (reason)
       if(right !== null) right.cancel (reason)
       context.fail(reason)
-      console.log("cancelling trycatch")
     })
+
     left.subscribe(event => context.emit(event))
         .run() 
         .then(()  => context.ok())

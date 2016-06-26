@@ -50,7 +50,6 @@ export function delay (...args: any[]) : ITask {
   ])
   return script("core/delay", context => {
     let handle = setTimeout(() => context.ok(), param.ms)
-    
     context.oncancel(reason => {
       clearTimeout(handle)
       context.fail(reason)

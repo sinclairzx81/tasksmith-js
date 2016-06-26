@@ -75,9 +75,9 @@ creates a task that will delay for the given number of milliseconds.
 
 ```javascript
 let mytask = () => task.series([
-  task.delay("waiting 1 second", 1000),
-  task.delay("waiting 1 second", 1000),
-  task.delay("waiting 1 second", 1000)
+  task.delay(1000),
+  task.delay(1000),
+  task.delay(1000)
 ])
 ```
 
@@ -118,8 +118,8 @@ let mytask = () => task.ifthen(
 ```
 ### ok
 returns a task that completes successfully.
-```
-let mytask = task.ok()
+```javascript
+let mytask = () => task.ok()
 ```
 
 ### parallel

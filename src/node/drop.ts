@@ -37,18 +37,10 @@ import * as fs     from "fs"
 
 /**
  * creates a task that recursively deletes a file or directory.
- * @param {string} a message to log.
  * @param {string} the path of the file or directory to delete.
  * @returns {ITask}
  */
-export function drop(message: string, target: string) : ITask
-
-/**
- * creates a task that recursively deletes a file or directory.
- * @param {string} the path of the file or directory to delete.
- * @returns {ITask}
- */
-export function drop(src: string, target: string) : ITask
+export function drop(drop_file_or_directory: string) : ITask
 
 /**
  * creates a task that recursively deletes a file or directory.
@@ -57,16 +49,13 @@ export function drop(src: string, target: string) : ITask
  */
 export function drop(...args: any[]) : ITask {
   let param = signature<{
-    message    : string,
-    target     : string,
+    drop_file_or_directory: string,
   }>(args, [
-      { pattern: ["string", "string"], map : (args) => ({ message: args[0], target: args[1] })  },
-      { pattern: ["string"],           map : (args) => ({ message: null,    target: args[0] })  },
+    { pattern: ["string"], map : (args) => ({ drop_file_or_directory: args[0] })  },
   ])
   return script("node/drop", context => {
-    if(param.message !== null) context.log(param.message)
     try {
-        let src      = path.resolve (param.target)
+        let src      = path.resolve (param.drop_file_or_directory)
         let dst_info = fsutil.meta  (src)
         let gather   = fsutil.tree  (src)
         gather.reverse()

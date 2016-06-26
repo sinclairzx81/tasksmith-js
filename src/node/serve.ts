@@ -122,31 +122,12 @@ export function serve(directory: string, port: number, watch: boolean, delay: nu
 
 /**
  * creates a infinite task that serves a directory over http.
- * @param {string} a message to log.
- * @param {string} the directory to serve.
- * @param {number} the port to serve this application on.
- * @param {boolean} should the task watch for content changes and live reload. (default false)
- * @returns {ITask}
- */
-export function serve(message: string, directory: string, port: number, watch: boolean) : ITask
-
-/**
- * creates a infinite task that serves a directory over http.
  * @param {string} the directory to serve.
  * @param {number} the port to serve this application on.
  * @param {boolean} should the task watch for content changes and live reload. (default false)
  * @returns {ITask}
  */
 export function serve(directory: string, port: number, watch: boolean) : ITask
-
-/**
- * creates a infinite task that serves a directory over http.
- * @param {string} a message to log.
- * @param {string} the directory to serve.
- * @param {number} the port to serve this application on.
- * @returns {ITask}
- */
-export function serve(message: string, directory: string, port: number) : ITask
 
 /**
  * creates a infinite task that serves a directory over http.
@@ -169,24 +150,19 @@ export function serve(...args: any[]) : ITask {
     delay     : number,
   }>(args, [
       { pattern: ["string", "number",  "boolean", "number"],            map : (args) => ({ directory: args[0], port: args[1], watch: args[2] , delay: args[3] })  },
-      { pattern: ["string", "string",  "number",  "boolean"],           map : (args) => ({ directory: args[1], port: args[2], watch: args[3] , delay: 0       })  },
       { pattern: ["string", "number",  "boolean"],                      map : (args) => ({ directory: args[0], port: args[1], watch: args[2] , delay: 0       })  },
-      { pattern: ["string", "string",  "number"],                       map : (args) => ({ directory: args[1], port: args[2], watch: false   , delay: 0       })  },
       { pattern: ["string", "number"],                                  map : (args) => ({ directory: args[0], port: args[1], watch: false   , delay: 0       })  }
   ])
   return script("node/serve", context => {
-    /**
-     * clients:
-     * 
-     * A collection of clients listening on
-     * the __signals endpoint.
-     */
-    let clients = []
+    let clients   : Function[]    = []
+    let listening : boolean       = false
+    let cancelled : boolean       = false 
+    let server    : http.Server   = null
+    let watcher   : fs.FSWatcher  = null
 
     /**
      * ========================================================
-     * directory watcher:
-     * 
+     * watcher:
      * if in watch mode, we setup a recursive
      * watch on the given directory. When
      * we get a signal from the file system,
@@ -194,16 +170,16 @@ export function serve(...args: any[]) : ITask {
      * a reload signal to each.
      * ========================================================
      */
-    
     if(param.watch === true) {
-      let waiting_on_fs_watch = true
-      fs.watch(param.directory, {recursive: true}, (event, filename) => {
-        if(waiting_on_fs_watch === true) {
-          waiting_on_fs_watch = false
+      let waiting = true
+      watcher = fs.watch(param.directory, {recursive: true}, (event, filename) => {
+        if(cancelled === true) return
+        if(waiting === true) {
+          waiting = false
           setTimeout(() => {
             clients.forEach(client => client("reload"))
             setTimeout(() => {  
-              waiting_on_fs_watch = true 
+              waiting = true 
             }, 100)
           }, param.delay)
         }
@@ -212,16 +188,14 @@ export function serve(...args: any[]) : ITask {
 
     /** 
      * http server:
-     * 
      * sets up the static file server.
      */
-    http.createServer((request, response) => {
-
+     server = <http.Server>http.createServer((request, response) => {
+      
       switch(request.url) {
         /**
          * ========================================================
          * signals endpoint:
-         * 
          * if a request comes in for the __signals
          * endpoint, initialize a long running
          * comet request. clients hold onto this
@@ -232,7 +206,6 @@ export function serve(...args: any[]) : ITask {
 
           /**
            * format headers:
-           * 
            * note: browsers may choose to buffer data
            * prior to emitting to the client. As a work
            * around, the following sets the content-type
@@ -251,7 +224,6 @@ export function serve(...args: any[]) : ITask {
 
           /** 
            * client:
-           * 
            * Each client contains consists of a single
            * function which is used to emit a signal
            * on its respective http response. we push
@@ -264,7 +236,6 @@ export function serve(...args: any[]) : ITask {
           
           /**
            * client drop:
-           * 
            * we listen out on the raw tcp connection
            * for the "end" event. This is a reliable
            * indication that the client has indeed
@@ -281,17 +252,14 @@ export function serve(...args: any[]) : ITask {
         /**
          * ========================================================
          * static handler:
-         * 
          * A standard http static files handler, with the 
          * exception that in on watch mode, we inject html
          * documents with the watch injection script.
          * ========================================================
          */
         default: {
-
           /**
            * format resource path:
-           * 
            * business as usual, here we make best attempts
            * to sanitize the incoming url, with particular
            * focus given to preventing the caller from escaping
@@ -308,7 +276,6 @@ export function serve(...args: any[]) : ITask {
 
           /**
            * mine types:
-           * 
            * We don't support all types of mime, but we do 
            * the most common. The reason for this was to keep
            * this script light. callers can add in additional
@@ -333,7 +300,6 @@ export function serve(...args: any[]) : ITask {
 
             /**
              * stat errors.
-             * 
              * probably a 404, return one for now.
              */
             if(err) {
@@ -344,7 +310,6 @@ export function serve(...args: any[]) : ITask {
 
             /**
              * directory serving:
-             * 
              * currently not supported.
              */
             if(stat.isDirectory()) {
@@ -361,7 +326,6 @@ export function serve(...args: any[]) : ITask {
 
               /**
                * html script injection:
-               * 
                * if in watch mode, we need to inject
                * the signals client script, the code
                * below checks if we are in watch mode,
@@ -377,7 +341,6 @@ export function serve(...args: any[]) : ITask {
                 break;
               /**
                * stream everything else.
-               * 
                * everything else is streamed, this 
                * should account for video, audio and
                * other types of media.
@@ -392,7 +355,19 @@ export function serve(...args: any[]) : ITask {
         }         
       }
     }).listen(param.port, error => {
-      if(error) context.fail(error.message)
+      if(error) { context.fail(error.message); return; }
+      listening = true
+    })
+
+    /**
+     * cancel:
+     * close watcher and server if applicable.
+     */
+    context.oncancel(reason => {
+      cancelled = true
+      if(server  !== null && listening   === true) server.close()
+      if(watcher !== null && param.watch === true) watcher.close()
+      context.fail(reason)
     })
   })
 }

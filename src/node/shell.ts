@@ -67,14 +67,15 @@ export function shell(...args: any[]) : ITask {
     let windows: boolean  = /^win/.test(process.platform)
     let child             = spawn(windows ? 'cmd' : 'sh', [windows ? '/c':'-c', param.command])
     let cancelled:boolean = false
+    // todo: improve process termination.
     context.oncancel(reason => {
       cancelled = true
       if(windows === true) {
-        /** minimal attempt to kill the child process. */
+        // minimal attempt to terminate the process.
         exec('taskkill /pid ' + child.pid + ' /T /F', (error) => { })
         context.fail(reason)
       } else {
-        /** even less than minimal effort to kill the process on non-windows... */
+        // even less than minimal effort to terminate the process on non-windows.
         child.stdout.removeAllListeners()
         child.stderr.removeAllListeners()
         child.stdout.pause()

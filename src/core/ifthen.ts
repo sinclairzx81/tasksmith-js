@@ -62,10 +62,8 @@ export function ifthen (...args:any []): ITask {
     { pattern: ["function", "function"], map : (args) => ({ condition: args[0], taskfunc: args[1]  })  },
   ])
   return script("core/ifthen", context => {
-
     let task     : ITask   = null
     let cancelled: boolean = false
-
     context.oncancel(reason => {
       cancelled = true
       if(task !== null) task.cancel(reason)
@@ -74,12 +72,10 @@ export function ifthen (...args:any []): ITask {
 
     param.condition(result => {
       if(cancelled === true) return
-
       if(result === false) { 
         context.ok()
         return 
       }
-      
       let task = param.taskfunc()
       task.subscribe(event => context.emit(event))
           .run()

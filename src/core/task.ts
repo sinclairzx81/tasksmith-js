@@ -28,7 +28,11 @@ THE SOFTWARE.
 
 import {Promise} from "../common/promise"
 
-
+/**
+ * formats variable length arguments on behalf of the task context.
+ * @param {any[]} arguments
+ * @returns {string}
+ */
 const format_arguments = (args: any[]) : string => {
   if(args === null || args === undefined) return ""
   if(Array.isArray(args)   === false)     return ""
@@ -44,10 +48,8 @@ const format_arguments = (args: any[]) : string => {
     : buffer.join(' ') 
 }
 
-
 /**
  * TaskCancellation:
- * 
  * A task cancellation token. Can optionally be
  * passed to tasks at creation, otherwise, an internal
  * cancellation object will be created. 
@@ -70,9 +72,9 @@ export class TaskCancellation {
    * @returns {void}
    */
   public subscribe(func: (reason: string) => void) : void {
-    if(this.state === "cancelled") throw Error("cannot subscribe to a task cancel that has already been cancelled.")
     this.subscribers.push(func)
   }
+
   /**
    * emits a cancellation signal to subscribers and marks this state as cancelled.
    * @param {string} the reason why this task was cancelled.
@@ -81,55 +83,42 @@ export class TaskCancellation {
   public cancel(reason: string) : void {
     if(this.state === "cancelled") throw Error("cannot cancel a task more than once.")
     this.subscribers.forEach(subscriber => subscriber(reason))
-    this.subscribers = []
     this.state       = "cancelled"
+    this.subscribers = []
   }
 }
 
 /**
  * TaskEvent:
- * 
  * As tasks execute, they emit events. Examples
  * include state transitions, logging and the 
  * end state of the task.
  */
 export interface TaskEvent {
-  /** the unique identity of this task. */
+  /** 
+   * the unique identity of this task. 
+   */
   id   : string
-  /** the name given to this task */
+  /** 
+   * the name given to this task 
+   */
   name : string 
-  /** the time in which this event was created. */
+  /** 
+   * the time in which this event was created. 
+   */
   time : Date
-  /** the type of event being emitted. */
+  /** 
+   * the type of event being emitted. 
+   */
   type : string
-  /** any data associated with this event. */
+  /** 
+   * any data associated with this event. 
+   */
   data : string
 }
 
 /**
- * TaskState:
- * 
- * The allowable states a task can be in.
- */
-export type TaskState = "pending" 
-                      | "started" 
-                      | "completed" 
-                      | "failed" 
-                      | "cancelled"
-/**
- * TaskExecutor:
- * 
- * Similar to a promise executor, given to
- * tasks to ok() or fail() the task with 
- * logging method.
- */
-export interface TaskExecutor {
-  (context: TaskContext) : void
-}
-
-/**
  * TaskContext:
- * 
  * Given to executing tasks.
  */
 export interface TaskContext {
@@ -171,7 +160,24 @@ export interface TaskContext {
   oncancel : (func: ( ...args: any[]) => void) => void
 }
 
+/**
+ * TaskExecutor:
+ * Similar to a promise executor, given to
+ * tasks to ok() or fail() the task with 
+ * logging method.
+ */
+export interface TaskExecutor { (context: TaskContext) : void }
 
+/**
+ * TaskState:
+ * The allowable states a task can be in.
+ */
+export type TaskState = "pending" | "started" | "completed"  | "failed" | "cancelled"
+
+/**
+ * ITask
+ * interface for tasks.
+ */
 export interface ITask {
 
   /**
@@ -202,11 +208,11 @@ export interface ITask {
  */
 export class Task implements ITask {
   private subscribers  : { (event: TaskEvent):void }[]
-  private task_id         : string
-  private task_name       : string
-  private task_state      : TaskState
-  private task_executor   : TaskExecutor
-  private task_cancellor  : TaskCancellation
+  private id         : string
+  private name       : string
+  private state      : TaskState
+  private executor   : TaskExecutor
+  private cancellor  : TaskCancellation
 
   /**
    * creates a new task.
@@ -215,12 +221,12 @@ export class Task implements ITask {
    * @returns {Task<T>}
    */
   constructor(name: string, task_executor : TaskExecutor, task_cancellor?: TaskCancellation) {
-    this.subscribers     = []
-    this.task_state      = "pending"
-    this.task_executor   = task_executor
-    this.task_cancellor  = task_cancellor || new TaskCancellation()
-    this.task_name       = name
-    this.task_id         = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    this.subscribers = []
+    this.state       = "pending"
+    this.executor    = task_executor
+    this.cancellor   = task_cancellor || new TaskCancellation()
+    this.name        = name
+    this.id          = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
         var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
         return v.toString(16);
     })
@@ -231,57 +237,34 @@ export class Task implements ITask {
    * @returns {Promise<string>}
    */
   public run() : Promise<string> {
+    if(this.state !== "pending") throw Error("cannot run a task more than once.")
+
     return new Promise<string>((resolve, reject) => {
       /**
        * started:
-       * 
        * tasks are only run once a caller has
        * invoked the tasks run function, in this
        * case, we emit a started event to any
        * subscribers and transision the state.
        */
-      this.task_state = "started"
+      this.state = "started"
       this._notify ({
-        id   : this.task_id,
-        name : this.task_name,
-        time : new Date(),
-        type : "started",
-        data : ""
+        id:   this.id,
+        name: this.name,
+        time: new Date(),
+        type: "started",
+        data: ""
       })
 
       /**
-       * executor: do i want to defer this?
-       * 
-       * Here we pass the executor function a
-       * task context for it to resolve this
-       * tasks internal promise. In addition,
-       * we listen out for any content calls
-       * and dispatch events for each.
+       * executor:
+       * Here, we invoke the task executor, 
+       * passing it the task context which is
+       * used to resolve the tasks inner promise.
        */
-      this.task_executor({
-
-        /**
-         * log:
-         * 
-         * the executor may opt to emit messages out, we 
-         * pass these off to subscribers to listen 
-         * to.
-         */
-        log: (...args: any[]) => {
-          if(this.task_state === "started") {
-            this._notify ({
-              id   : this.task_id,
-              name : this.task_name,
-              time : new Date(),
-              type : "log",
-              data : format_arguments(args)
-            })
-          }
-        },
-
+      this.executor({
         /**
          * emit:
-         * 
          * when executing, the task may need to
          * emit events on behalf of inner tasks.
          * The executor may subscribe on the inner
@@ -289,51 +272,72 @@ export class Task implements ITask {
          * with this function.
          */
         emit: (event: TaskEvent) => {
-          if(this.task_state === "started") {
+          if(this.state === "started") {
             this._notify (event)
+          }
+        },
+        
+        /**
+         * log:
+         * the executor may opt to emit messages out, we 
+         * pass these off to subscribers to listen 
+         * to.
+         */
+        log: (...args: any[]) => {
+          if(this.state === "started") {
+            let data = format_arguments(args)
+            this._notify ({
+              id:   this.id,
+              name: this.name,
+              time: new Date(),
+              type: "log",
+              data: data
+            })
           }
         },
 
         /**
          * ok:
-         * 
          * on ok, we set the state to completed
          * resolve the inner promise and 
          * emit a completed event to subscribers.
          */
         ok : (...args: any[]) => {
-          if(this.task_state === "started") {
-            this.task_state = "completed"
+          if(this.state === "started") {
+            this.state = "completed"
+            let data = format_arguments(args)
             this._notify ({
-              id   : this.task_id,
-              name : this.task_name,
-              time : new Date(),
-              type : "completed",
-              data : format_arguments(args)
+              id:   this.id,
+              name: this.name,
+              time: new Date(),
+              type: "completed",
+              data: data
             })
             resolve(format_arguments(args))
           }
         },
+
         /**
          * fail:
-         * 
          * on fail, we set the state to failed,
          * reject the inner promise and 
          * emit a failed event to subscribers.
          */
         fail: (...args: any[]) => {
-          if(this.task_state === "started") {
-            this.task_state = "failed"
-            this._notify ({
-              id   : this.task_id,
-              name : this.task_name,
-              time : new Date(),
-              type : "failed",
-              data : format_arguments(args)
+          if(this.state === "started") {
+            this.state = "failed"
+            let data = format_arguments(args)
+            this._notify ({ 
+              id:   this.id, 
+              name: this.name, 
+              time: new Date(), 
+              type: "failed", 
+              data: data 
             })
             reject(format_arguments(args))
           }
         },
+
         /**
          * oncancel:
          * 
@@ -344,8 +348,8 @@ export class Task implements ITask {
          * against the tasks cancellor.
          */
         oncancel : (func) => {
-          if(this.task_state === "started") {
-            this.task_cancellor.subscribe(func)
+          if(this.state === "started") {
+            this.cancellor.subscribe(func)
           }
         }
       })
@@ -358,8 +362,8 @@ export class Task implements ITask {
    * @returns {void}
    */
   public cancel(reason?: string) : void {
-    if(this.task_state === "started")
-      this.task_cancellor.cancel(reason || "")
+    if(this.state === "started")
+      this.cancellor.cancel(reason || "")
   }
 
   /**
@@ -368,8 +372,7 @@ export class Task implements ITask {
    * @returns {void}
    */
   public subscribe(func: (event: TaskEvent) => void) : ITask {
-    if(this.task_state !== "pending") 
-      throw Error("can only subscribe to a task while in a pending state.")
+    if(this.state !== "pending") throw Error("can only subscribe to a task while in a pending state.")
     this.subscribers.push(func)
     return this
   }

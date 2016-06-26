@@ -33,18 +33,6 @@ import {ITask}            from "../core/task"
 import {script}           from "../core/script"
 import * as fs            from "fs"
 
-
-/**
- * creates a infinite task that repeats changes to the given file or directory path.
- * @param {string} a message to log.
- * @param {string} the file or directory to watch.
- * @param {number} sets the minimum delta time in which this watcher will react to fs signals (default is 1000)
- * @param {boolean} indicates if the watchers inner task should run immediate before waiting on system notification. (default is true)
- * @param {() => ITask} a function to return a task on each iteration.
- * @returns {ITask}
- */
-export function watch(message: string, path: string, delay: number, immediate: boolean, taskfunc: () => ITask) : ITask
-
 /**
  * creates a infinite task that repeats changes to the given file or directory path.
  * @param {string} the file or directory to watch.
@@ -81,27 +69,30 @@ export function watch(path: string, taskfunc: () => ITask) : ITask
  */
 export function watch(...args: any[]) : ITask {
   let param = signature<{
-    message   : string,
     path      : string,
     delay     : number,
     immediate : boolean,
     taskfunc  : () => ITask
   }>(args, [
-      { pattern: ["string", "string", "number",  "boolean", "function"], map : (args) => ({ message: args[0], path: args[1], delay: args[2], immediate: args[3], taskfunc: args[4]  })  },
-      { pattern: ["string", "number", "boolean", "function"],            map : (args) => ({ message: null,    path: args[0], delay: args[1], immediate: args[2], taskfunc: args[3]  })  },
-      { pattern: ["string", "number", "function"],                       map : (args) => ({ message: null,    path: args[0], delay: args[1], immediate: true,    taskfunc: args[2]  })  },
-      { pattern: ["string", "function"],                                 map : (args) => ({ message: null,    path: args[0], delay: 1000,    immediate: true,    taskfunc: args[1]  })  }
+      { pattern: ["string", "number", "boolean", "function"], map : (args) => ({ path: args[0], delay: args[1], immediate: args[2], taskfunc: args[3]  })  },
+      { pattern: ["string", "number", "function"],            map : (args) => ({ path: args[0], delay: args[1], immediate: true,    taskfunc: args[2]  })  },
+      { pattern: ["string", "function"],                      map : (args) => ({ path: args[0], delay: 1000,    immediate: true,    taskfunc: args[1]  })  }
   ])
   return script("node/watch", context => {
-    if(param.message !== null) context.log(param.message)
     let waiting  : boolean = true
     let task     : ITask   = null
     let completed: boolean = false;
+    let cancelled: boolean = false;
+    context.oncancel(reason => {
+      cancelled = true
+      if(task !== null) task.cancel(reason)
+      context.fail(reason)
+    })
     
     const next = () => {
+      if(cancelled === true) return
       /**
        * wait:
-       * 
        * The file system is liable to signal
        * hundreds of change events in quick 
        * succession.
@@ -116,7 +107,6 @@ export function watch(...args: any[]) : ITask {
         
         /**
          * waiting timeout:
-         * 
          * We set a timeout to switch the waiting
          * flag back to true. This timeout is tied
          * back to the delay parameter passed by 
@@ -126,7 +116,6 @@ export function watch(...args: any[]) : ITask {
 
         /**
          * cancel:
-         * 
          * A task may still be running when we receive
          * the change signal. Because of this, there is
          * a need to cancel to previous task before 
@@ -135,12 +124,11 @@ export function watch(...args: any[]) : ITask {
          * from being lost.
          */
         if(task !== null && completed === false) {
-          task.cancel("watch restart.")
+          task.cancel("restarting.")
         }
         
         /**
          * execute and allow errors:
-         * 
          * execute the task. We have a special case
          * here with regards to handling errors on the 
          * inner task. 
@@ -161,7 +149,6 @@ export function watch(...args: any[]) : ITask {
     
     /**
      * run immediate:
-     * 
      * sometimes, its nice to be able to run the
      * inner tasks before we receive a system from
      * the file system. In this instance, just 
@@ -171,7 +158,6 @@ export function watch(...args: any[]) : ITask {
     
     /**
      * start listening:
-     * 
      * setup the fs watcher to run in 
      * recursive mode.
      */

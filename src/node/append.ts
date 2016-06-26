@@ -35,15 +35,6 @@ import * as fs     from "fs"
 
 /**
  * creates a task that appends a file with the given content.
- * @param {string} a message to log.
- * @param {string} the filename being appended.
- * @param {string} the content to append.
- * @returns {ITask}
- */
-export function append(message: string, target: string, content: string) : ITask 
-
-/**
- * creates a task that appends a file with the given content.
  * @param {string} the filename being appended.
  * @param {string} the content to append.
  * @returns {ITask}
@@ -57,17 +48,15 @@ export function append(target: string, content: string) : ITask
  */
 export function append(...args: any[]) : ITask {
   let param = signature<{
-    message  : string,
     target   : string,
     content  : string
   }>(args, [
-      { pattern: ["string", "string", "string"], map : (args) => ({ message: args[0], target: args[1], content: args[2]  })  },
-      { pattern: ["string", "string"],           map : (args) => ({ message: null,    target: args[0], content: args[1]  })  },
+      { pattern: ["string", "string"],  map: (args) => ({ target: args[0], content: args[1]  })  },
   ])
   return script("node/append", context => {
-    if(param.message !== null) context.log(param.message)
     try {
-       fs.writeFileSync(param.target, [ fs.readFileSync(param.target, "utf8"), param.content].join("\n"))
+       let content = [ fs.readFileSync(param.target, "utf8"), param.content].join("\n")
+       fs.writeFileSync(param.target, content)
        context.ok()
     }catch (error) {
       context.fail(error.message)

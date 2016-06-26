@@ -62,14 +62,11 @@ export function retry(...args: any[]): ITask {
 
     const next = () => {
       if(cancelled === true) return
-
       if(iteration === param.retries) { 
         context.fail() 
         return
       }
-
       if(task !== null) task.cancel()
-
       iteration += 1
       task = param.taskfunc(iteration)
       task.subscribe(event => context.emit(event))

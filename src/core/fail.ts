@@ -56,6 +56,5 @@ export function fail(...args: any[]): ITask {
       { pattern: ["string"], map : (args) => ({ message: args[0] })  },
       { pattern: [],         map : (args) => ({ message: ""  })  },
   ])
-  
   return script("core/fail", context => context.fail(param.message))
 }
