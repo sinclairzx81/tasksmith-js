@@ -41,4 +41,4 @@ let event_format = tabulate([
  * @param {TaskEvent} The event to format.
  * @returns {string}
  */
-export const format = (event: any) : string => event_format(event as TabulateObject)
+export const format = (event: any) : string => event_format(event as TabulateObject).trim()
