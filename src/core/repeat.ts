@@ -69,16 +69,31 @@ export function repeat(...args: any[]): ITask {
       { pattern: ["number", "function"],           map : (args) => ({ message: null,    iterations: args[0], taskfunc: args[1]  })  },
   ])
   return script("core/repeat", context => {
-    if(param.message !== null) context.log(param.message)
-    let iteration = 0
+    let iteration : number  = 0
+    let task      : ITask   = null
+    let cancelled : boolean = false
+    context.oncancel(reason => {
+      cancelled = true
+      if(task !== null) task.cancel(reason)
+      context.fail(reason)
+    })
+
     const next = () => {
-      if(iteration === param.iterations) { context.ok(); }
-      else {
-        iteration += 1
-        context.run( param.taskfunc(iteration) )
-              .then(()     => next())
-              .catch(error => context.fail(error))
+      if(cancelled === true) return
+
+      if(iteration === param.iterations) { 
+        context.ok()
+        return
       }
+
+      if(task !== null) task.cancel()
+
+      iteration += 1
+      task = param.taskfunc(iteration)
+      task.subscribe(event => context.emit(event))
+          .run  ()
+          .then (()    => next())
+          .catch(error => context.fail(error))
     }; next()    
   })
 }

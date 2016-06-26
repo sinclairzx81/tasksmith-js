@@ -46,15 +46,6 @@ export interface ResolveFunction<T> {
 
 /**
  * creates a task that executes either left or right based on a condition.
- * @param {string} a message to log.
- * @param {ResolveFunction<boolean>} function to asynchronous resolve a condition.
- * @param {()=>ITask} a function that returns a new task when true.
- * @param {()=>ITask} a function that returns a new task when false.
- * @returns {ITask}
- */
-export function ifelse (message: string, condition: ResolveFunction<boolean>, left: ()=> ITask, right: () => ITask) : ITask;
-/**
- * creates a task that executes either left or right based on a condition.
  * @param {ResolveFunction<boolean>} function to asynchronous resolve a condition.
  * @param {()=>ITask} a function that returns a new task when true.
  * @param {()=>ITask} a function that returns a new task when false.
@@ -74,20 +65,32 @@ export function ifelse (condition: ResolveFunction<boolean>, left: ()=> ITask, r
  */
 export function ifelse(...args: any[]) : ITask {
   let param = signature<{
-    message   : string,
     condition : ResolveFunction<boolean>
     left      : () => ITask,
     right     : () => ITask
   }>(args, [
-      { pattern: ["string", "function", "function", "function"], map : (args) => ({ message: args[0], condition: args[1], left: args[2], right: args[3]  })  },
-      { pattern: ["function", "function", "function"],           map : (args) => ({ message: null,    condition: args[0], left: args[1], right: args[2]  })  },
+      { pattern: ["function", "function", "function"],  map: (args) => ({ condition: args[0], left: args[1], right: args[2]  })  },
   ])
   return script("core/ifelse", context => {
+
+    let task      : ITask    = null
+    let cancelled : boolean  = false
+
+    context.oncancel(reason => {
+      cancelled = true
+      if(task !== null) task.cancel(reason)
+      context.fail(reason)
+      
+    })
+
     param.condition(result => {
-      let task = (result) ? param.left(): param.right()
-      context.run(task)
-             .then(()     => context.ok() )
-             .catch(error => context.fail(error))
+      if(cancelled === true) return
+
+      task = (result) ? param.left() : param.right()
+      task.subscribe(event => context.emit(event))
+          .run   ()
+          .then  (()    => context.ok())
+          .catch (error => context.fail(error))
     })
   })
 }

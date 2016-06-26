@@ -26,79 +26,16 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {Promise}                from "../common/promise"
-import {signature}              from "../common/signature"
-import {ITask, Task, TaskEvent} from "./task"
-
-/** 
- * specialized string formatter for variable length argument 
- * calls on the script contexts .log(), .ok() and .fail()
- * methods.
- * @param {any[]} arguments.
- * @returns {string}
- * @example
- * 
- * assert(format ("hello", "world"), "hello world") 
- * assert(format ("hello", null),    "hello")
- * assert(format (null, "world"),    "world")
- * assert(format (null, null),       "")
- * assert(format (),                 "")
- */
-function format (args: any[]) : string  {
-  if(args === null || args === undefined) return ""
-  if(Array.isArray(args)   === false)     return ""
-  let buffer = []
-  for(let i = 0; i < args.length; i++) {
-    if(args[i] === null || args[i] === undefined) continue;
-    let str = args[i].toString()
-    if(str.length === 0) continue;
-    buffer.push(str)
-  }
-  return (buffer.length === 1) 
-    ? buffer[0]
-    : buffer.join(' ') 
-}
-
-/**
- * A script context given to callers to resolve a task.
- */
-export interface IScriptContext {
-  
-  /**
-   * emits a information message for this task.
-   * @param {...args: any[]} optional string message to emit.
-   * @returns {void}
-   */
-  log(...args: any[]) : void
-  
-  /**
-   * completes this task with a optional message.
-   * @param {string?} optional string message to emit.
-   * @returns {void}
-   */
-  ok  (...args: any[]) : void
-  
-  /**
-   * fails this task with a optional message.
-   * @param {string?} optional string message to emit.
-   * @returns {void}
-   */
-  fail(...args: any[]) : void
-
-  /**
-   * runs this task and logs its events.
-   * @param {ITask} the task to run.
-   * @returns {Promise<string>} A promise indicating ok or fail.
-   */
-  run (task: ITask) : Promise<string>
-}
+import {Promise}                             from "../common/promise"
+import {signature}                           from "../common/signature"
+import {ITask, Task, TaskContext, TaskEvent} from "./task"
 
 /**
  * creates a new script task.
  * @param {Function} a function to receive a script context when this task is run.
  * @returns {ITask}
  */
-export function script (func: (context: IScriptContext) => void) : ITask
+export function script (func: (context: TaskContext) => void) : ITask
 
 /**
  * creates a new script task.
@@ -106,7 +43,7 @@ export function script (func: (context: IScriptContext) => void) : ITask
  * @param {Function} a function to receive a script context when this task is run.
  * @returns {ITask}
  */
-export function script (name: string, func: (context: IScriptContext) => void) : ITask
+export function script (name: string, func: (context: TaskContext) => void) : ITask
 
 /**
  * creates a new script task.
@@ -124,17 +61,10 @@ export function script (name: string, func: (context: IScriptContext) => void) :
 export function script (...args: any[]) : ITask {
   let param = signature<{
      task:  string,
-     func: (context: IScriptContext) => void
+     func: (context: TaskContext) => void
   }>(args, [
       { pattern: ["string", "function"], map : (args) => ({ task: args[0],       func: args[1] })  },
       { pattern: ["function"],           map : (args) => ({ task: "core/script", func: args[0] })  },
   ])
-  return new Task(param.task, (id, emitter) => {
-    param.func({
-      log : (...args: any[]) => emitter({ id: id, task: param.task, time: new Date(), type: "log",  data: format(args) }),
-      ok  : (...args: any[]) => emitter({ id: id, task: param.task, time: new Date(), type: "ok",   data: format(args) }),
-      fail: (...args: any[]) => emitter({ id: id, task: param.task, time: new Date(), type: "fail", data: format(args) }),
-      run : (task: ITask) => task.subscribe(event => emitter(event)).run()
-    })
-  })
+  return new Task(param.task, param.func)
 }

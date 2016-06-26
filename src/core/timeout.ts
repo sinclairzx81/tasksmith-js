@@ -33,16 +33,6 @@ import {script}    from "./script"
 /**
  * creates a task that will fail if its inner task has not 
  * completed within the given number of milliseconds.
- * @param {string} a message to log.
- * @param {number} the number of milliseconds before timeout.
- * @param {()=>ITask} a function to return a new task.
- * @returns {ITask}
- */
-export function timeout (message: string, ms: number, taskfunc: () => ITask) : ITask;
-
-/**
- * creates a task that will fail if its inner task has not 
- * completed within the given number of milliseconds.
  * @param {number} the number of milliseconds before timeout.
  * @param {()=>ITask} a function to return a new task.
  * @returns {ITask}
@@ -54,30 +44,27 @@ export function timeout (ms: number, taskfunc: () => ITask) : ITask;
  * completed within the given number of milliseconds.
  * @param {any[]} arguments.
  * @returns {ITask}
- * @example
- * 
- * let mytask = task.timeout(3000, () => task.series([
- *    task.delay(1000),
- *    task.delay(1000),
- *    task.delay(1000),
- *    task.delay(1000),
- *    task.delay(1000)
- * ]))
  */
 export function timeout(...args: any[]): ITask {
   let param = signature<{
-    message : string,
     ms      : number,
     taskfunc: () => ITask
   }>(args, [
-      { pattern: ["string", "number", "function"], map : (args) => ({ message: args[0], ms: args[1], taskfunc: args[2]  }) },
-      { pattern: ["number", "function"],           map : (args) => ({ message: null,    ms: args[0], taskfunc: args[1]  }) },
+      { pattern: ["number", "function"], map : (args) => ({ ms: args[0], taskfunc: args[1]  }) },
   ])
   return script("core/timeout", context => {
-    if(param.message !== null) context.log(param.message)
-    const timeout = setTimeout(() => context.fail("timeout elapsed."), param.ms)
-    context.run(param.taskfunc())
-          .then(()     => context.ok())
-          .catch(error => context.fail(error))
+    let task     : ITask   = param.taskfunc()
+    let cancelled: boolean = false
+    let handle   : any     = setTimeout(() => task.cancel("timeout elaspsed."), param.ms)
+    context.oncancel(reason => {
+      cancelled = true
+      clearTimeout(handle)
+      task.cancel(reason)
+      context.fail(reason)
+    })
+    task.subscribe(event => context.emit(event))
+        .run()
+        .then(()     => context.ok())
+        .catch(error => context.fail(error))
   })
 }

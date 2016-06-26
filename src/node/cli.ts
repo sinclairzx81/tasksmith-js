@@ -49,7 +49,9 @@ export const cli = (argv: string[], tasks: {[taskname: string]: ITask}) => scrip
   } else {
     let task = tasks[args[0]]
     context.log("running: [" + args[0] + "]")
-    context.run(task).then(_      => context.ok())
-                     .catch(error => context.fail(error))
+    task.subscribe(event => context.log(event))
+        .run()
+        .then(_      => context.ok())
+        .catch(error => context.fail(error))
   }
 })

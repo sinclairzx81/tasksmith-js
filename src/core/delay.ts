@@ -32,14 +32,6 @@ import {script}    from "./script"
 
 /**
  * creates a task that will delay for the given number of milliseconds.
-*  @param {string} a message to log.
- * @param {ms} the number of milliseconds to delay.
- * @returns {ITask}
- */
-export function delay (message: string, ms: number) : ITask
-
-/**
- * creates a task that will delay for the given number of milliseconds.
  * @param {ms} the number of milliseconds to delay.
  * @returns {ITask}
  */
@@ -49,24 +41,19 @@ export function delay (ms: number) : ITask
  * creates a task that will delay for the given number of milliseconds.
  * @param {any[]} arguments
  * @returns {ITask}
- * @example
- * 
- * let mytask = task.series([
- *    task.delay("waiting 1 second", 1000),
- *    task.delay("waiting 1 second", 1000),
- *    task.delay("waiting 1 second", 1000)
- * ])
  */
 export function delay (...args: any[]) : ITask {
   let param = signature<{
-    message: string,
-    ms  : number
+    ms: number
   }>(args, [
-      { pattern: ["string", "number"], map : (args) => ({ message: args[0], ms: args[1]  })  },
-      { pattern: ["number"],           map : (args) => ({ message: null,    ms: args[0]  })  },
+      { pattern: ["number"], map : (args) => ({ ms: args[0]  })  },
   ])
   return script("core/delay", context => {
-    if(param.message !== null) context.log(param.message)
-    setTimeout(() => context.ok(), param.ms)
+    let handle = setTimeout(() => context.ok(), param.ms)
+    
+    context.oncancel(reason => {
+      clearTimeout(handle)
+      context.fail(reason)
+    })
   })
 }

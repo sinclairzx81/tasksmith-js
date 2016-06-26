@@ -48,23 +48,14 @@ export function fail(): ITask
  * creates a task that immediately fails.
  * @param {any[]} arguments.
  * returns {ITask}
- * @example
- * 
- * let mytask = () => task.series([
- *   task.ok("1"),
- *   task.ok("2"),
- *   task.fail("3")
- * ])
  */
 export function fail(...args: any[]): ITask {
   let param = signature<{
     message: string
   }>(args, [
       { pattern: ["string"], map : (args) => ({ message: args[0] })  },
-      { pattern: [],         map : (args) => ({ message: null  })  },
+      { pattern: [],         map : (args) => ({ message: ""  })  },
   ])
-  return script("core/fail", context => {
-    if(param.message !== null) context.log(param.message)
-    context.fail()
-  })
+  
+  return script("core/fail", context => context.fail(param.message))
 }

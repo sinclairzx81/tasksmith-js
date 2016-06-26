@@ -36,7 +36,7 @@ import {script}    from "./script"
  * @param {string} info message.
  * returns {ITask}
  */
-export function ok(info: string): ITask
+export function ok(message: string): ITask
 
 /**
  * returns a task that completes successfully.
@@ -51,14 +51,10 @@ export function ok(): ITask
  */
 export function ok(...args: any[]): ITask {
   let param = signature<{
-    info: string
+    message: string
   }>(args, [
-      { pattern: ["string"], map : (args) => ({ info: args[0] })  },
-      { pattern: [],         map : (args) => ({ info: null  })  },
+      { pattern: ["string"], map : (args) => ({ message: args[0] })  },
+      { pattern: [],         map : (args) => ({ message: null  })  },
   ])
-  return script("core/ok", context => {
-    if(param.info !== null) 
-      context.log(param.info)
-    context.ok()
-  })
+  return script("core/ok", context =>  context.ok(param.message || ""))
 }

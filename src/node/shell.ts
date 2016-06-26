@@ -32,15 +32,7 @@ import {signature} from  "../common/signature"
 import {ITask}     from "../core/task"
 import {script}    from "../core/script"
 import {spawn}     from "child_process"
-
-/**
- * creates a task that executes a shell command.
- * @param {string} a message to log.
- * @param {string} the shell command to execute.
- * @param {number} the expected exitcode.
- * @returns {ITask}
- */
-export function shell(message: string, command: string, exitcode: number) : ITask;
+import {exec}      from "child_process"
 
 /**
  * creates a task that executes a shell command.
@@ -49,15 +41,6 @@ export function shell(message: string, command: string, exitcode: number) : ITas
  * @returns {ITask}
  */
 export function shell(command: string, exitcode: number) : ITask;
-
-/**
- * creates a task that executes a shell command.
- * @param {string} a message to log.
- * @param {string} the shell command to execute.
- * @param {number} the expected exitcode.
- * @returns {ITask}
- */
-export function shell(message: string, command: string) : ITask;
 
 /**
  * creates a task that executes a shell command.
@@ -73,30 +56,41 @@ export function shell(command: string) : ITask;
  */
 export function shell(...args: any[]) : ITask {
   let param = signature<{
-    message   : string,
     command   : string,
     exitcode  : number
   }>(args, [
-      { pattern: ["string", "string", "number"], map : (args) => ({ message: args[0], command: args[1], exitcode: args[2]  })  },
-      { pattern: ["string", "number"],           map : (args) => ({ message: null,    command: args[0], exitcode: args[1]  })  },
-      { pattern: ["string", "string"],           map : (args) => ({ message: args[0], command: args[1], exitcode: 0        })  },
-      { pattern: ["string"],                     map : (args) => ({ message: null,    command: args[0], exitcode: 0        })  },
+      { pattern: ["string", "number"], map : (args) => ({ command: args[0], exitcode: args[1]  })  },
+      { pattern: ["string"],           map : (args) => ({ command: args[0], exitcode: 0        })  },
   ])  
 
   return script("node/shell", context => {
-    if(param.message !== null) context.log(param.message)
+    let windows: boolean  = /^win/.test(process.platform)
+    let child             = spawn(windows ? 'cmd' : 'sh', [windows ? '/c':'-c', param.command])
+    let cancelled:boolean = false
+    context.oncancel(reason => {
+      cancelled = true
+      if(windows === true) {
+        /** minimal attempt to kill the child process. */
+        exec('taskkill /pid ' + child.pid + ' /T /F', (error) => { })
+        context.fail(reason)
+      } else {
+        /** even less than minimal effort to kill the process on non-windows... */
+        child.stdout.removeAllListeners()
+        child.stderr.removeAllListeners()
+        child.stdout.pause()
+        child.stderr.pause()
+        child.stdin.end()
+        child.kill("SIGINT")
+        context.fail(reason)
+      }
+    })
     context.log(param.command)
-    const windows = /^win/.test(process.platform)
-    const proc    = spawn(windows ? 'cmd' : 'sh', [windows ? '/c':'-c', param.command])
-    proc.stdout.setEncoding("utf8")
-    proc.stdout.on("data",  data  => context.log ("stdout:", data))
-    proc.stderr.on("data",  data  => context.log ("stderr:", data))
-    proc.on("error",        error => context.fail(error.toString))
-    proc.on("close",        code  => {
-      // TODO: investigate better way of shutting down the shell.
-      //       this implementation waits before closing due to the
-      //       contents of the output stream not being entirely 
-      //       available.
+    child.stdout.setEncoding("utf8")
+    child.stdout.on("data",  data  => context.log (data))
+    child.stderr.on("data",  data  => context.log (data))
+    child.on("error",        error => context.fail(error.toString))
+    child.on("close",        code  => {
+      if(cancelled === true) return
       setTimeout(() => {
         (param.exitcode !== code)
           ? context.fail("shell: unexpected exit code. expected" , param.exitcode, " got ", code)

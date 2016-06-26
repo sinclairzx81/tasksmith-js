@@ -110,18 +110,6 @@ const inject_signals_script = (content: string) => {
   return content;
 }
 
-
-/**
- * creates a infinite task that serves a directory over http.
- * @param {string} a message to log.
- * @param {string} the directory to serve.
- * @param {number} the port to serve this application on.
- * @param {boolean} should the task watch for content changes and live reload. (default false)
- * @param {number} suspends the reload signal for the given number of milliseconds. (default 0)
- * @returns {ITask}
- */
-export function serve(message: string, directory: string, port: number, watch: boolean, delay: number) : ITask
-
 /**
  * creates a infinite task that serves a directory over http.
  * @param {string} the directory to serve.
@@ -175,22 +163,18 @@ export function serve(directory: string, port: number) : ITask
  */
 export function serve(...args: any[]) : ITask {
   let param = signature<{
-    message   : string,
     directory : string,
     port      : number,
     watch     : boolean,
     delay     : number,
   }>(args, [
-      { pattern: ["string", "string",  "number",  "boolean", "number"], map : (args) => ({ message: args[0], directory: args[1], port: args[2], watch: args[3] , delay: args[4] })  },
-      { pattern: ["string", "number",  "boolean", "number"],            map : (args) => ({ message: null,    directory: args[0], port: args[1], watch: args[2] , delay: args[3] })  },
-      { pattern: ["string", "string",  "number",  "boolean"],           map : (args) => ({ message: args[0], directory: args[1], port: args[2], watch: args[3] , delay: 0       })  },
-      { pattern: ["string", "number",  "boolean"],                      map : (args) => ({ message: null,    directory: args[0], port: args[1], watch: args[2] , delay: 0       })  },
-      { pattern: ["string", "string",  "number"],                       map : (args) => ({ message: args[0], directory: args[1], port: args[2], watch: false   , delay: 0       })  },
-      { pattern: ["string", "number"],                                  map : (args) => ({ message: null,    directory: args[0], port: args[1], watch: false   , delay: 0       })  }
+      { pattern: ["string", "number",  "boolean", "number"],            map : (args) => ({ directory: args[0], port: args[1], watch: args[2] , delay: args[3] })  },
+      { pattern: ["string", "string",  "number",  "boolean"],           map : (args) => ({ directory: args[1], port: args[2], watch: args[3] , delay: 0       })  },
+      { pattern: ["string", "number",  "boolean"],                      map : (args) => ({ directory: args[0], port: args[1], watch: args[2] , delay: 0       })  },
+      { pattern: ["string", "string",  "number"],                       map : (args) => ({ directory: args[1], port: args[2], watch: false   , delay: 0       })  },
+      { pattern: ["string", "number"],                                  map : (args) => ({ directory: args[0], port: args[1], watch: false   , delay: 0       })  }
   ])
   return script("node/serve", context => {
-    if(param.message !== null) context.log(param.message)
-
     /**
      * clients:
      * 

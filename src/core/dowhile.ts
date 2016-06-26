@@ -33,25 +33,12 @@ import {script}    from "./script"
 /**
  * a next function, passed to resolve to asynchronously resolve values.
  */
-export interface NextFunction<T> {
-  (value: T) : void
-}
+export interface NextFunction<T> { (value: T) : void }
 
 /**
  * a resolve function used for asynchronous resolution of values.
  */
-export interface ResolveFunction<T> {
-  (next: NextFunction<T>): void
-}
-
-/**
- * creates a task that repeats while a condition is true.
- * @param {string} a message to log.
- * @param {ResolveFunction<boolean>} a function to asynchronously resolve a boolean.
- * @param {() => ITask} a function to return a new task on each iteration.
- * @returns {ITask} 
- */
-export function dowhile(message: string, condition: ResolveFunction<boolean>, taskfunc: () => ITask) : ITask
+export interface ResolveFunction<T> { (next: NextFunction<T>): void }
 
 /**
  * creates a task that repeats while a condition is true.
@@ -65,31 +52,33 @@ export function dowhile(condition: ResolveFunction<boolean>, taskfunc: () => ITa
  * creates a task that repeats while a condition is true.
  * @param {any[]} arguments.
  * @returns {ITask}
- * @example
- * 
- * let mytask = () => task.series([
- *   task.ok("1"),
- *   task.ok("2"),
- *   task.ok("3")
- * ])
- *
- * let dowhile = task.dowhile(next => next(true), mytask)
  */
 export function dowhile (...args: any[]) : ITask {
   let param = signature<{
-    message   : string,
     condition : ResolveFunction<boolean>
     taskfunc  : () => ITask
   }>(args, [
-      { pattern: ["string", "function", "function"], map : (args) => ({ message: args[0], condition: args[1], taskfunc: args[2]  })  },
-      { pattern: ["function", "function"],           map : (args) => ({ message: null,    condition: args[0], taskfunc: args[1]  })  },
+      { pattern: ["function", "function"], map : (args) => ({ condition: args[0], taskfunc: args[1]  })  },
   ])
   return script("core/dowhile", context => {
-    if(param.message !== null) context.log(param.message)
+    let task     : ITask   = null
+    let cancelled: boolean = false
+
+    context.oncancel(reason => {
+      cancelled = true
+      if(task !== null) task.cancel(reason)
+      context.fail(reason)
+
+    })
+
     const next = () => {
-      context.run(param.taskfunc())
-            .then(()     => param.condition(result => (result) ? next() : context.ok() ))
-            .catch(error => context.fail(error))
+      if(cancelled === true) return
+      
+      task = param.taskfunc()
+      task.subscribe(event => context.emit(event))
+          .run()
+          .then(()       => param.condition(result =>  (result) ? next() : context.ok() ))
+          .catch(error   => context.fail(error))
     }; next()
   })
 }

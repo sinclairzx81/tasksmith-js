@@ -31,14 +31,6 @@ import {script}    from "./script"
 
 /**
  * creates a task that runs its inner tasks in series.
- * @param {string} a message to log.
- * @param {Array<Task>} an array of tasks to run in parallel.
- * @returns {ITask}
- */
-export function series (message: string, tasks: Array<ITask>) : ITask;
-
-/**
- * creates a task that runs its inner tasks in series.
  * @param {Array<Task>} an array of tasks to run in parallel.
  * @returns {ITask}
  */
@@ -55,25 +47,34 @@ export function series (tasks: Array<ITask>) : ITask;
  *  task.delay("2", 1000),
  *  task.delay("3", 1000),
  * ])
- * 
  */
 export function series (...args: any[]) : ITask {
   let param = signature<{
-    message : string,
     tasks   : Array<ITask>
   }>(args, [
-      { pattern: ["string", "array"], map : (args) => ({ message: args[0], tasks: args[1]  }) },
-      { pattern: ["array"],           map : (args) => ({ message: null,    tasks: args[0]  }) },
+      { pattern: ["array"], map : (args) => ({ tasks: args[0]  }) },
   ])
   return script("core/series", context => {
-    if(param.message !== null) context.log(param.message) 
+    let task     : ITask   = null
+    let cancelled: boolean = false
+    context.oncancel(reason => {
+      cancelled = true
+      if(task !== null) task.cancel(reason)
+      context.fail(reason)
+    })
     const next = () => {
-      if (param.tasks.length === 0) { context.ok() } 
-      else {
-       context.run(param.tasks.shift())
-              .then(next)
-              .catch(error => context.fail(error))
+      if(cancelled === true) return
+
+      if (param.tasks.length === 0) {
+        context.ok()
+        return
       }
+
+      task = param.tasks.shift()
+      task.subscribe(event => context.emit(event))
+          .run      ()
+          .then     (next)
+          .catch    (error => context.fail(error))
     }; next()
   })
 }

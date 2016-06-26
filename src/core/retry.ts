@@ -32,15 +32,6 @@ import {script}    from "./script"
 
 /**
  * creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
- * @param {string} a message to log.
- * @param {number} the number of retries.
- * @param {() => ITask} a function to return a new task on each iteration.
- * @returns {ITask}
- */
-export function retry(message: string, retries: number, taskfunc: (iteration: number) => ITask) : ITask 
-
-/**
- * creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
  * @param {number} the number of retries.
  * @param {() => ITask} a function to return a new task on each iteration.
  * @returns {ITask}
@@ -51,34 +42,40 @@ export function retry(retries: number, taskfunc: (iteration: number) => ITask) :
  * creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
  * @param {any[]} arguments
  * @returns {ITask}
- * @example
- * 
- * let mytask = task.retry(10, (i) => task.series([
- *   task.ok  (i + " -> 1 "),
- *   task.ok  (i + " -> 2 "),
- *   task.fail(i + " -> 3 ")
- * ]))
  */
 export function retry(...args: any[]): ITask {
   let param = signature<{
-    message    : string,
     retries    : number,
     taskfunc   : (iteration: number) => ITask
   }>(args, [
-      { pattern: ["string", "number", "function"], map : (args) => ({ message: args[0], retries: args[1], taskfunc: args[2]  })  },
-      { pattern: ["number", "function"],           map : (args) => ({ message: null,    retries: args[0], taskfunc: args[1]  })  },
+      { pattern: ["number", "function"], map : (args) => ({ retries: args[0], taskfunc: args[1]  })  },
   ])
   return script("core/retry", context => {
-    if(param.message !== null) context.log(param.message)
-    let iteration = 0
+    let iteration : number  = 0
+    let task      : ITask   = null
+    let cancelled : boolean = false
+    context.oncancel(reason => {
+      cancelled = true
+      if(task !== null) task.cancel(reason)
+      context.fail(reason)
+    })
+
     const next = () => {
-      if(iteration === param.retries) { context.fail(); }
-      else {
-        iteration += 1
-        context.run( param.taskfunc(iteration) )
-              .then(()     => context.ok())
-              .catch(error => next())
+      if(cancelled === true) return
+
+      if(iteration === param.retries) { 
+        context.fail() 
+        return
       }
+
+      if(task !== null) task.cancel()
+
+      iteration += 1
+      task = param.taskfunc(iteration)
+      task.subscribe(event => context.emit(event))
+          .run   ()
+          .then  (()    => context.ok())
+          .catch (error => next())
     }; next()    
   })
 }

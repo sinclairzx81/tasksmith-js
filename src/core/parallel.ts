@@ -32,14 +32,6 @@ import {script}    from "./script"
 
 /**
  * creates a task that runs its inner tasks in parallel.
- * @param {string} a message to log.
- * @param {Array<Task>} an array of tasks to run in parallel.
- * @returns {ITask}
- */
-export function parallel (message: string, tasks: Array<ITask>) : ITask;
-
-/**
- * creates a task that runs its inner tasks in parallel.
  * @param {Array<Task>} an array of tasks to run in parallel.
  * @returns {ITask}
  */
@@ -49,27 +41,27 @@ export function parallel (tasks: Array<ITask>) : ITask;
  * creates a task that runs its inner tasks in parallel.
  * @param {any[]} arguments
  * @returns {ITask}
- * @example
- * 
- * let mytask = () => task.parallel([
- *  task.delay("1", 1000),
- *  task.delay("2", 1000),
- *  task.delay("3", 1000),
- * ])
  */
 export function parallel (...args: any[]) {
   let param = signature<{
-    message  : string,
     tasks    : Array<ITask>
   }>(args, [
-      { pattern: ["string", "array"], map : (args) => ({ message: args[0], tasks: args[1]  })  },
-      { pattern: ["array"],           map : (args) => ({ message: null,    tasks: args[0]  })  },
+      { pattern: ["array"], map : (args) => ({ tasks: args[0]  })  },
   ])
   return script("core/parallel", context => {
-    if(param.message !== null) context.log(param.message)
-    let thenables = param.tasks.map(task => context.run(task))
-    Promise.all(thenables)
-            .then (()    => context.ok())
-            .catch(error => context.fail(error))
+    let completed: number  = 0
+    let cancelled: boolean = false
+    context.oncancel(reason => {
+      cancelled = true
+      param.tasks.forEach(task => task.cancel(reason))
+      context.fail(reason)
+    })
+    
+    param.tasks.forEach(task => {
+      task.subscribe(event => context.emit(event))
+          .run  ()
+          .then (()    => { completed += 1; if(completed === param.tasks.length) { context.ok() } })
+          .catch(error => context.fail(error))
+    })
   })
 }

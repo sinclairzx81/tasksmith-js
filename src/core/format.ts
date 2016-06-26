@@ -32,7 +32,7 @@ import {tabulate, TabulateObject}  from "../common/tabulate"
 let event_format = tabulate([
   {key: "time",   width: 10, pad: 1, map: time => time.toTimeString() },
   {key: "type",   width: 10, pad: 1},
-  {key: "task",   width: 16, pad: 1},
+  {key: "name",   width: 16, pad: 1},
   {key: "data",   width: 80, wrap: true},
 ])
 

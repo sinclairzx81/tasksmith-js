@@ -32,15 +32,6 @@ import {script}    from "./script"
 
 /**
  * creates a task that will try the left task, and if fail, will fallback to the right task.
- * @param {string} a message to log.
- * @param {() => ITask} a function to return the left task.
- * @param {() => ITask} a function to return the right task.
- * @returns {ITask}
- */
-export function trycatch(message: string, left: () => ITask, right : () => ITask) : ITask;
-
-/**
- * creates a task that will try the left task, and if fail, will fallback to the right task.
  * @param {() => ITask} a function to return the left task.
  * @param {() => ITask} a function to return the right task.
  * @returns {ITask}
@@ -59,21 +50,32 @@ export function trycatch(left: () => ITask, right : () => ITask) : ITask;
  */
 export function trycatch(...args: any[]) : ITask {
   let param = signature<{
-    message   : string,
     left      : () => ITask,
     right     : () => ITask
   }>(args, [
-      { pattern: ["string", "function", "function"], map : (args) => ({ message: args[0], left: args[1], right: args[2]  })  },
-      { pattern: ["function", "function"],           map : (args) => ({ message: null,    left: args[0], right: args[1]  })  },
+      { pattern: ["function", "function"], map : (args) => ({ left: args[0], right: args[1]  })  },
   ])
   return script("core/trycatch", context => {
-    if(param.message !== null) context.log(param.message)
-    context.run(param.left())
-        .then(() => context.ok())
-        .catch(error => {
-          context.run(param.right())
-                 .then(()     => context.ok())
-                 .catch(error => context.fail(error))
+    let left      : ITask   = param.left()
+    let right     : ITask   = null
+    let cancelled : boolean = false
+    context.oncancel(reason => {
+      cancelled = true
+      if(left  !== null) left.cancel  (reason)
+      if(right !== null) right.cancel (reason)
+      context.fail(reason)
+      console.log("cancelling trycatch")
+    })
+    left.subscribe(event => context.emit(event))
+        .run() 
+        .then(()  => context.ok())
+        .catch(() => {
+          if(cancelled === true) return
+          let right = param.right()       
+          right.subscribe(event => context.emit(event))
+               .run()
+               .then(()     => context.ok())
+               .catch(error => context.fail(error))
         })
   })
 }
