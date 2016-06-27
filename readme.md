@@ -15,7 +15,7 @@ task.debug(mytask())
 
 ## overview
 
-tasksmith is no dependency build automation library written for node. This library enables developers
+tasksmith is a no dependency build automation library written for node. This library enables developers
 to compose sophisticated asynchronous workflows from small reusable tasks.
 
 ## building from source
