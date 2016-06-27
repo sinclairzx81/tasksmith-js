@@ -52,9 +52,12 @@ import * as url           from "url"
  * @returns {string} 
  */
 const signals_client_script = () => `
-<!-- BEGIN: SIGNALS -->
 <script type="text/javascript">
+
 window.addEventListener("load", function() {
+  //---------------------------------
+  // tasksmith: signals
+  //---------------------------------
   function connect(handler) {
     var xhr = new XMLHttpRequest();
     var idx = 0;
@@ -74,7 +77,8 @@ window.addEventListener("load", function() {
   function handler(signal) {
     switch(signal) {
       case "established": console.log("signals: established");  break;
-      case "reload":      window.location.reload();  break;    
+      case "reload"     : window.location.reload(); break;
+      case "ping"       : break;    
       case "disconnect":
         console.log("signals: disconnected");
         setTimeout(function() {
@@ -87,7 +91,6 @@ window.addEventListener("load", function() {
   connect(handler)
 })
 </script>
-<!-- END: SIGNALS -->
 `
 
 /**
@@ -154,11 +157,12 @@ export function serve(...args: any[]) : ITask {
       { pattern: ["string", "number"],                                  map : (args) => ({ directory: args[0], port: args[1], watch: false   , delay: 0       })  }
   ])
   return script("node/serve", context => {
-    let clients   : Function[]    = []
-    let listening : boolean       = false
-    let cancelled : boolean       = false 
-    let server    : http.Server   = null
-    let watcher   : fs.FSWatcher  = null
+    let clients   : Function[]    = []    // signal clients.
+    let listening : boolean       = false // http listening state
+    let cancelled : boolean       = false // task cancelation state
+    let waiting   : boolean       = true  // fs signal wait state
+    let server    : http.Server   = null  // http server
+    let watcher   : fs.FSWatcher  = null  // directory watcher
 
     /**
      * ========================================================
@@ -171,16 +175,13 @@ export function serve(...args: any[]) : ITask {
      * ========================================================
      */
     if(param.watch === true) {
-      let waiting = true
       watcher = fs.watch(param.directory, {recursive: true}, (event, filename) => {
         if(cancelled === true) return
         if(waiting === true) {
           waiting = false
           setTimeout(() => {
             clients.forEach(client => client("reload"))
-            setTimeout(() => {  
-              waiting = true 
-            }, 100)
+            setTimeout(() =>  waiting = true, 100)
           }, param.delay)
         }
       })
@@ -234,6 +235,16 @@ export function serve(...args: any[]) : ITask {
             response.write(signal) 
           }; clients.push(client)
           
+          /** 
+           * keep-alive:
+           * setup a simple keep alive. Most clients
+           * will timeout the TCP request if no data
+           * is received over the transport. 
+           */
+          let keep_alive = setInterval(() => {
+            response.write("ping") 
+          }, 15000);
+
           /**
            * client drop:
            * we listen out on the raw tcp connection
@@ -244,8 +255,9 @@ export function serve(...args: any[]) : ITask {
            */
           let request_: any = request
           request_.connection.on("end", () => {
-            context.log("SIG: client disconnected")
+            clearInterval(keep_alive)
             clients = clients.splice(clients.indexOf(client), 1)
+            context.log("SIG: client disconnected")
           })
         } break;
 

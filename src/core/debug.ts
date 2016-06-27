@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------------
 
-tasksmith - minimal task automation library for node.
+tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
@@ -26,40 +26,13 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-// core modules.
-import {debug}                  from "./core/debug"
-import {delay}                  from "./core/delay"
-import {dowhile}                from "./core/dowhile"
-import {fail}                   from "./core/fail"
-import {format}                 from "./core/format"
-import {ifelse}                 from "./core/ifelse"
-import {ifthen}                 from "./core/ifthen"
-import {ok}                     from "./core/ok"
-import {parallel}               from "./core/parallel"
-import {repeat}                 from "./core/repeat"
-import {retry}                  from "./core/retry"
-import {script}                 from "./core/script"
-import {series}                 from "./core/series"
-import {ITask, Task, TaskEvent} from "./core/task"
-import {timeout}                from "./core/timeout"
-import {trycatch}               from "./core/trycatch"
+import {Promise}    from "../common/promise"
+import {ITask}      from "./task"
+import {format}     from "./format"
 
-export {
-  /** core modules */
-  debug,
-  delay,
-  dowhile,
-  fail,
-  format,
-  ifelse,
-  ifthen,
-  ok,
-  parallel,
-  repeat,
-  retry,
-  script,
-  series,
-  ITask, Task, TaskEvent,
-  timeout,
-  trycatch
-}
+/**
+ * debugs a task by invoking the task and writing its output to the environment console.
+ * @param {ITask} the task to debug.
+ * returns {ITask}
+ */
+export const debug = (task: ITask): Promise<string> => task.subscribe(event => console.log(format(event))).run()

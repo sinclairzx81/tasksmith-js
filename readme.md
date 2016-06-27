@@ -1,22 +1,22 @@
 # tasksmith-js
 
-### task automation library for node
+## task automation library for node
 
 ```js
 const task = require('./tasksmith.js')
 
 let mytask = () => task.series([
   task.shell("npm install"),
-  task.shell("node app.js")
+  task.shell("npm start")
 ])
 
-mytask().run()
+task.debug(mytask())
 ```
 
 ## overview
 
-tasksmith is minimal no dependency task runner for node that allows developers to 
-script sophiticated workflows by composing them from smaller reusable tasks. 
+tasksmith is no dependency build automation library written for node. This library enables developers
+to compose sophisticated asynchronous workflows from small reusable tasks.
 
 ## building from source
 ```
@@ -25,30 +25,40 @@ node tasks build-all
 ```
 ## running tasks
 
-To run a task, call its run() function.
+To run a task, call its run() function. The run() function returns a Promise type which the caller can learn of success or failure of the task.
 
 ```javascript
 task.delay(1000)
     .run()
-    .then(() => console.log("done"))
+    .then(()     => console.log("done"))
     .catch(error => console.log(error))
 
 ```
-optionally, you can subscribe to any logging occuring during task execution.
+All tasks emit various logging information, its possible to subscribe to the log events produced by a task with 
+the following.
 
 ```javascript
-let mytask = task.series([
+let mytask = () => task.series([
   task.ok   ("running task 1"),
   task.ok   ("running task 2"),
   task.fail ("running task 3"),
   task.ok   ("running task 4"),
 ])
 
-// subscribe and run.
-mytask.subscribe(event => {
-  console.log(task.format(event))
-}).run()
-
+// subscribe then run.
+mytask().subscribe(event => console.log(event)).run()
+```
+the above code can be simplified with the debug function, which will write logging information out
+to the environments console.
+```javascript
+let mytask = () => task.series([
+  task.ok   ("running task 1"),
+  task.ok   ("running task 2"),
+  task.fail ("running task 3"),
+  task.ok   ("running task 4"),
+])
+// 
+task.debug(mytask())
 ```
 which outputs the following
 ```
@@ -64,7 +74,7 @@ which outputs the following
 15:37:11  fail      core/fail
 15:37:11  fail      core/series
 ```
-
+note: the task.debug() function also returns a Promise.
 ## core tasks
 
 tasksmith provides a number of built in tasks, these tasks may be
@@ -232,9 +242,10 @@ let mytask = () => task.drop( "./file_or_directory")
 
 ### serve
 
-creates a infinite task that serves static content for the given directory and provides live reload functionality.
+creates a task that serves static content over http for the given directory and port.
 
-note: because this task never finishes, run with other tasks within a parallel task block.
+note: the third parameter is an optional flag to run the task in watch mode. In watch mode,
+the task will provide live reload functionality on changes to the directory being served.
 
 ```javascript
 let mytask = () => task.serve("./website", 5000, true)
@@ -250,9 +261,7 @@ let mytask = () => task.shell("npm install typescipt")
 
 ### watch
 
-creates a infinite task that runs its inner task on file system changes.
-
-note: because this task never finishes, run with other tasks within a parallel task block.
+creates a task that repeats its inner task on file system changes. 
 
 ```javascript
 let mytask = () => task.watch("./website", () => task.ok("something changed."))
@@ -265,15 +274,17 @@ creates a task that creates a simple cli to run tasks by name from the command l
 the following is some example script for a task file named "mytasks.js".
 
 ```javascript
+"use strict";
+
 const task = require("./tasksmith.js")
 
-let clean    = () => task.ok("running clean task.")
-let install  = () => task.ok("running install task.")
-let watch    = () => task.ok("running watch task.")
-let build    = () => task.ok("running build task.")
-let publish  = () => task.ok("running publish task.")
+const clean    = () => task.ok("running clean task.")
+const install  = () => task.ok("running install task.")
+const watch    = () => task.ok("running watch task.")
+const build    = () => task.ok("running build task.")
+const publish  = () => task.ok("running publish task.")
 
-let cli = () => task.cli(process.argv, {
+const cli = () => task.cli(process.argv, {
   "clean"   : clean(),
   "install" : install(),
   "watch"   : watch(),
@@ -281,9 +292,8 @@ let cli = () => task.cli(process.argv, {
   "publish" : publish()
 })
 
-cli().subscribe(event => {
-  console.log(task.format(event))
-}).run()
+task.debug(cli())
+
 ```
 which can be run at the command line with.
 

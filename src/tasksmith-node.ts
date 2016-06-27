@@ -27,6 +27,7 @@ THE SOFTWARE.
 ---------------------------------------------------------------------------*/
 
 // core modules.
+import {debug}                  from "./core/debug"
 import {delay}                  from "./core/delay"
 import {dowhile}                from "./core/dowhile"
 import {fail}                   from "./core/fail"
@@ -55,6 +56,7 @@ import {watch}                  from "./node/watch"
 
 export {
   /** core modules */
+  debug,
   delay,
   dowhile,
   fail,
