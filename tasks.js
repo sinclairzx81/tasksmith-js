@@ -28,12 +28,9 @@ THE SOFTWARE.
 
 "use strict";
 
-/**
- * (support) executes this shell script.
- * @param   {string} the shell command to execute.
- * @param   {number} the expected exit code for this process.
- * @returns {Promise}
- */
+//------------------------------------------
+// (support) executes this shell script.
+//------------------------------------------
 const shell = (command, exitcode) => () => new Promise((resolve, reject) => {
   console.log("shell:", command)
   exitcode = exitcode || 0
@@ -50,12 +47,9 @@ const shell = (command, exitcode) => () => new Promise((resolve, reject) => {
   })
 })
 
-/**
- * (support) concatinates the given files together.
- * @param {string} the target file to concatinate to.
- * @param {string[]} the files to concatinate.
- * @returns {Promise}
- */
+//------------------------------------------
+// (support) concatinates the given files together.
+//------------------------------------------
 const concat = (dst, files) => () => new Promise((resolve, reject) => {
   const fs = require("fs")
   console.log("concat:", files, "->", dst)
@@ -64,12 +58,9 @@ const concat = (dst, files) => () => new Promise((resolve, reject) => {
   resolve()
 })
 
-/**
- * (support) appends this file with the given string content.
- * @param {string} the file to append
- * @param {string} the content to append.
- * @returns {Promise}
- */
+//------------------------------------------
+// (support) appends this file with the given string content.
+//------------------------------------------
 const append = (file, content) => () => new Promise((resolve, reject) => {
   const fs = require("fs")
   console.log("concat:", file, "->", content)
@@ -77,12 +68,9 @@ const append = (file, content) => () => new Promise((resolve, reject) => {
   resolve()
 })
 
-/**
- * (support) creates a small cli to execute tasks.
- * @param {...args: any[]} the arguments given by process.argv
- * @param {Promise[]} an array of promises.
- * @returns {void}
- */
+//------------------------------------------
+// (support) creates a small cli to execute tasks.
+//------------------------------------------
 const cli = (argv, tasks) => () => {
   let args = process.argv.reduce((acc, c, index) => {
     if(index > 1) acc.push(c)
@@ -100,24 +88,22 @@ const cli = (argv, tasks) => () => {
   }
 }
 
-/**
- * (task) cleans out bin directory.
- * @returns {Promise[]}
- */
+//------------------------------------------
+// (task) cleans bin directory.
+//------------------------------------------
 const clean = () => [ shell("rm -rf ./bin") ]
 
-/**
- * (task) builds browser profile.
- * @returns {Promise[]}
- */
+//------------------------------------------
+// (task) builds browser profile.
+//------------------------------------------
 const build_browser = () => [
   shell ("tsc ./src/tasksmith-browser.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/browser/tasksmith.js"),
 ]
 
-/**
- * (task) builds node profile.
- * @returns {Promise[]}
- */
+
+//------------------------------------------
+// (task) builds node profile.
+//------------------------------------------
 const build_node = () => [
   shell ("tsc ./src/boot.ts        --removeComments --outFile ./bin/node/boot.js"),
   shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/node/tasksmith.js"),
@@ -126,16 +112,15 @@ const build_node = () => [
   shell ("rm -rf ./bin/node/boot.js")
 ]
 
-/**
- * (task) builds everything.
- * @returns {Promise[]}
- */
-const build_all = () => build_browser().concat(build_node())
+//------------------------------------------
+// (task) builds everything.
+//------------------------------------------
+const build = () => build_browser().concat(build_node())
 
 /** the cli configuration. */
 cli(process.argv, {
   "build-node"    : build_node(),
   "build-browser" : build_browser(),
-  "build-all"     : build_all(),
+  "build"         : build(),
   "clean"         : clean()
 })()

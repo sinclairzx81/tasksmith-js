@@ -35,6 +35,33 @@ import * as fs            from "fs"
 
 /**
  * creates a infinite task that repeats changes to the given file or directory path.
+ * @param {string[]} the file or directory paths to watch.
+ * @param {number} sets the minimum delta time in which this watcher will react to fs signals (default is 1000)
+ * @param {boolean} indicates if the watchers inner task should run immediate before waiting on system notification. (default is true)
+ * @param {() => ITask} a function to return a task on each iteration.
+ * @returns {ITask}
+ */
+export function watch(paths: string[], delay: number, immediate: boolean, taskfunc: () => ITask) : ITask
+
+/**
+ * creates a infinite task that repeats changes to the given file or directory path.
+ * @param {string[]} the file or directory paths to watch.
+ * @param {number} sets the minimum delta time in which this watcher will react to fs signals (default is 1000)
+ * @param {() => ITask} a function to return a task on each iteration.
+ * @returns {ITask}
+ */
+export function watch(paths: string[], delay: number, taskfunc: () => ITask) : ITask
+
+/**
+ * creates a infinite task that repeats changes to the given file or directory path.
+ * @param {string[]} the file or directory paths to watch.
+ * @param {() => ITask} a function to return a task on each iteration.
+ * @returns {ITask}
+ */
+export function watch(paths: string[], taskfunc: () => ITask) : ITask
+
+/**
+ * creates a infinite task that repeats changes to the given file or directory path.
  * @param {string} the file or directory to watch.
  * @param {number} sets the minimum delta time in which this watcher will react to fs signals (default is 1000)
  * @param {boolean} indicates if the watchers inner task should run immediate before waiting on system notification. (default is true)
@@ -69,23 +96,29 @@ export function watch(path: string, taskfunc: () => ITask) : ITask
  */
 export function watch(...args: any[]) : ITask {
   let param = signature<{
-    path      : string,
+    paths     : string[],
     delay     : number,
     immediate : boolean,
     taskfunc  : () => ITask
   }>(args, [
-      { pattern: ["string", "number", "boolean", "function"], map : (args) => ({ path: args[0], delay: args[1], immediate: args[2], taskfunc: args[3]  })  },
-      { pattern: ["string", "number", "function"],            map : (args) => ({ path: args[0], delay: args[1], immediate: true,    taskfunc: args[2]  })  },
-      { pattern: ["string", "function"],                      map : (args) => ({ path: args[0], delay: 1000,    immediate: true,    taskfunc: args[1]  })  }
+      { pattern: ["array",  "number", "boolean", "function"],  map : (args) => ({ paths:  args[0],  delay: args[1], immediate: args[2], taskfunc: args[3]  }) },
+      { pattern: ["array",  "number", "function"],             map : (args) => ({ paths:  args[0],  delay: args[1], immediate: true,    taskfunc: args[2]  }) },
+      { pattern: ["array",  "function"],                       map : (args) => ({ paths:  args[0],  delay: 1000,    immediate: true,    taskfunc: args[1]  }) },
+      { pattern: ["string", "number", "boolean", "function"],  map : (args) => ({ paths: [args[0]], delay: args[1], immediate: args[2], taskfunc: args[3]  }) },
+      { pattern: ["string", "number", "function"],             map : (args) => ({ paths: [args[0]], delay: args[1], immediate: true,    taskfunc: args[2]  }) },
+      { pattern: ["string", "function"],                       map : (args) => ({ paths: [args[0]], delay: 1000,    immediate: true,    taskfunc: args[1]  }) }
   ])
   return script("node/watch", context => {
-    let waiting  : boolean = true
-    let task     : ITask   = null
-    let completed: boolean = false;
-    let cancelled: boolean = false;
+    let task     : ITask          = null
+    let watchers : fs.FSWatcher[] = null
+    let waiting  : boolean        = true
+    let completed: boolean        = false;
+    let cancelled: boolean        = false;
+
     context.oncancel(reason => {
       cancelled = true
-      if(task !== null) task.cancel(reason)
+      if(watchers !== null) watchers.forEach(watcher => watcher.close())
+      if(task     !== null) task.cancel(reason)
       context.fail(reason)
     })
     
@@ -102,7 +135,7 @@ export function watch(...args: any[]) : ITask {
        * flag to false.
        */
       if(waiting === true) {
-        context.log("change detected.")
+        context.log("watch change detected.")
         waiting = false;
         
         /**
@@ -124,7 +157,7 @@ export function watch(...args: any[]) : ITask {
          * from being lost.
          */
         if(task !== null && completed === false) {
-          task.cancel("restarting.")
+          task.cancel("watch cancelled task.")
         }
         
         /**
@@ -158,9 +191,8 @@ export function watch(...args: any[]) : ITask {
     
     /**
      * start listening:
-     * setup the fs watcher to run in 
-     * recursive mode.
+     * sets up the fs watchers to run recursive.
      */
-    fs.watch(param.path, {recursive: true}, (event, filename) => next())
+    watchers = param.paths.map(path => fs.watch(path, {recursive: true}, (event, filename) => next()))
   })
 }
