@@ -29,6 +29,15 @@ THE SOFTWARE.
 import {signature} from "../common/signature"
 import {ITask}     from "./task"
 import {script}    from "./script"
+import {ok}        from "./ok"
+
+/**
+ * creates a task that will delay for the given number of milliseconds then run its inner task.
+ * @param {ms} the number of milliseconds to delay.
+ * @param {() => ITask} A task to run after the delay has elapsed.
+ * @returns {ITask}
+ */
+export function delay (ms: number, taskfunc: () => ITask) : ITask
 
 /**
  * creates a task that will delay for the given number of milliseconds.
@@ -44,14 +53,38 @@ export function delay (ms: number) : ITask
  */
 export function delay (...args: any[]) : ITask {
   let param = signature<{
-    ms: number
+    ms      : number,
+    taskfunc: () => ITask
   }>(args, [
-      { pattern: ["number"], map : (args) => ({ ms: args[0]  })  },
+    { pattern: ["number", "function"], map : (args) => ({ ms: args[0], taskfunc: args[1]     })  },
+    { pattern: ["number"],             map : (args) => ({ ms: args[0], taskfunc: () => ok()  })  },
   ])
   return script("core/delay", context => {
-    let handle = setTimeout(() => context.ok(), param.ms)
+    let cancelled = false
+    
+    /**
+     * timeout: 
+     * set timeout for delay, once
+     * elapsed, check if we havent
+     * cancelled, and if not, execute
+     * inner task.
+     */
+    let timeout = setTimeout(() => {
+      if(cancelled === true) return
+      let task = param.taskfunc()
+      task.subscribe(event => context.emit(event))
+          .run  ()
+          .then (()      => context.ok())
+          .catch((error) => context.fail(error))
+    }, param.ms)
+
+    /**
+     * cancel:
+     * listen out for cancellation.
+     */
     context.oncancel(reason => {
-      clearTimeout(handle)
+      cancelled = true
+      clearTimeout(timeout)
       context.fail(reason)
     })
   })
