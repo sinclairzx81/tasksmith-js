@@ -113,6 +113,17 @@ const build_node = () => [
 ]
 
 //------------------------------------------
+// (task) builds the starter 
+//------------------------------------------
+const build_starter = () => [
+  shell ("tsc ./src/boot.ts           --removeComments --outFile ./starters/boot.js"),
+  shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./starters/tasksmith.js"),
+  concat("./starters/tasksmith.js", [ "./license",  "./starters/boot.js", "./starters/tasksmith.js" ]),
+  append("./starters/tasksmith.js", "module.exports = collect();"),
+  shell ("rm -rf ./starters/boot.js")
+]
+
+//------------------------------------------
 // (task) builds everything.
 //------------------------------------------
 const build = () => build_browser().concat(build_node())
@@ -121,6 +132,7 @@ const build = () => build_browser().concat(build_node())
 cli(process.argv, {
   "build-node"    : build_node(),
   "build-browser" : build_browser(),
+  "build-starter" : build_starter(),
   "build"         : build(),
   "clean"         : clean()
 })()
