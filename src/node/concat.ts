@@ -31,7 +31,8 @@ THE SOFTWARE.
 import {signature} from "../common/signature"
 import {ITask}     from "../core/task"
 import {script}    from "../core/script"
-import * as fs     from "fs"
+import * as util   from "./util"
+import * as path   from "path"
 
 /**
  * creates a task that concatinates multiple files to an output file.
@@ -39,7 +40,7 @@ import * as fs     from "fs"
  * @param {string[]} the sources to concatinate.
  * @returns {ITask}
  */
-export function concat(outputFile: string, sources: string[]) : ITask
+export function concat(output: string, sources: string[]) : ITask
 
 /**
  * creates a task that concatinates multiple files to an output file.
@@ -48,15 +49,16 @@ export function concat(outputFile: string, sources: string[]) : ITask
  */
 export function concat(...args: any[]) : ITask {
   let param = signature<{
-    outputFile : string,
-    sources    : string[]
+    output : string,
+    sources: string[]
   }>(args, [
-      { pattern: ["string", "array"], map: (args) => ({ outputFile: args[0], sources: args[1]  })  },
+      { pattern: ["string", "array"], map: (args) => ({ output: args[0], sources: args[1]  }) },
   ])
   return script("node/concat", context => {
     try {
-      let content = param.sources.map(file => fs.readFileSync(file, "utf8")).join("\n")
-      fs.writeFileSync(param.outputFile, content)
+      let output  = path.resolve(param.output)
+      let sources = param.sources.map(source => path.resolve(source))
+      util.concat(output, sources, message => context.log(message))
       context.ok()
     } catch(error) {
       context.fail(error.message)

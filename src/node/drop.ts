@@ -31,16 +31,15 @@ THE SOFTWARE.
 import {signature} from "../common/signature"
 import {ITask}     from "../core/task"
 import {script}    from "../core/script"
-import * as fsutil from "./fsutil"
+import * as util   from "./util"
 import * as path   from "path"
-import * as fs     from "fs"
 
 /**
  * creates a task that recursively deletes a file or directory.
  * @param {string} the path of the file or directory to delete.
  * @returns {ITask}
  */
-export function drop(drop_file_or_directory: string) : ITask
+export function drop(target: string) : ITask
 
 /**
  * creates a task that recursively deletes a file or directory.
@@ -49,34 +48,17 @@ export function drop(drop_file_or_directory: string) : ITask
  */
 export function drop(...args: any[]) : ITask {
   let param = signature<{
-    drop_file_or_directory: string,
+    target: string
   }>(args, [
-    { pattern: ["string"], map : (args) => ({ drop_file_or_directory: args[0] })  },
+    { pattern: ["string"], map : (args) => ({ target: args[0] })  },
   ])
   return script("node/drop", context => {
     try {
-        let src      = path.resolve (param.drop_file_or_directory)
-        let dst_info = fsutil.meta  (src)
-        let gather   = fsutil.tree  (src)
-        gather.reverse()
-        gather.forEach(src_info => {
-            switch(src_info.type) {
-              case "empty":   break;
-              case "invalid": break;
-              case "directory":
-                let directory = path.join(src_info.dirname, src_info.basename)
-                context.log(fsutil.message("drop", [directory]))
-                fs.rmdirSync(directory)
-                break;
-              case "file":
-                let filename = path.join(src_info.dirname, src_info.basename)
-                context.log(fsutil.message("drop", [filename]))
-                fs.unlinkSync(filename)
-            }
-        })
-        context.ok()
-      } catch(error) { 
-        context.fail(error.message)
-      }
+      let target = path.resolve (param.target)
+      util.drop(target, message => context.log(message))
+      context.ok()
+    } catch(error) { 
+      context.fail(error.message)
+    }
   })
 }

@@ -31,10 +31,13 @@ THE SOFTWARE.
 import {signature} from "../common/signature"
 import {ITask}     from "../core/task"
 import {script}    from "../core/script"
-import * as fs     from "fs"
+import * as util   from "./util"
+import * as path   from "path"
 
 /**
- * creates a task that appends a file with the given content.
+ * creates a task that appends a file with the given content. If
+ * the target file does not exist, it will be created with the
+ * given content.
  * @param {string} the filename being appended.
  * @param {string} the content to append.
  * @returns {ITask}
@@ -42,7 +45,9 @@ import * as fs     from "fs"
 export function append(target: string, content: string) : ITask 
 
 /**
- * creates a task that appends a file with the given content.
+ * creates a task that appends a file with the given content. If
+ * the target file does not exist, it will be created with the
+ * given content.
  * @param {any[]} arguments.
  * @returns {ITask}
  */
@@ -55,10 +60,10 @@ export function append(...args: any[]) : ITask {
   ])
   return script("node/append", context => {
     try {
-       let content = [ fs.readFileSync(param.target, "utf8"), param.content].join("\n")
-       fs.writeFileSync(param.target, content)
+       let target = path.resolve(param.target)
+       util.append(target, param.content, (message) => context.log(message))
        context.ok()
-    }catch (error) {
+    } catch (error) {
       context.fail(error.message)
     }
   })

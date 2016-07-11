@@ -101,7 +101,7 @@ window.addEventListener("load", function() {
  * @returns {string} the injected content.
  */
 const inject_signals_script = (content: string) => {
-  let inject_index  = content.length; // content.indexOf("</html>")
+  let inject_index  = content.length;
   let watch_prefix  = content.slice(0, inject_index)
   let watch_content = signals_client_script()
   let watch_postfix = content.slice(inject_index)

@@ -861,83 +861,12 @@ define("core/trycatch", ["require", "exports", "common/signature", "core/script"
     }
     exports.trycatch = trycatch;
 });
-define("node/append", ["require", "exports", "common/signature", "core/script", "fs"], function (require, exports, signature_14, script_13, fs) {
+define("node/util", ["require", "exports", "path", "fs"], function (require, exports, path, fs) {
     "use strict";
-    function append() {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        var param = signature_14.signature(args, [
-            { pattern: ["string", "string"], map: function (args) { return ({ target: args[0], content: args[1] }); } },
-        ]);
-        return script_13.script("node/append", function (context) {
-            try {
-                var content = [fs.readFileSync(param.target, "utf8"), param.content].join("\n");
-                fs.writeFileSync(param.target, content);
-                context.ok();
-            }
-            catch (error) {
-                context.fail(error.message);
-            }
-        });
-    }
-    exports.append = append;
-});
-define("node/cli", ["require", "exports", "core/script"], function (require, exports, script_14) {
-    "use strict";
-    exports.cli = function (argv, tasks) { return script_14.script("node/cli", function (context) {
-        var args = process.argv.reduce(function (acc, c, index) {
-            if (index > 1)
-                acc.push(c);
-            return acc;
-        }, []);
-        if (args.length !== 1 || tasks[args[0]] === undefined) {
-            context.log("tasks:");
-            Object.keys(tasks).forEach(function (key) { return context.log(" - ", key); });
-            context.ok();
-        }
-        else {
-            var task = tasks[args[0]];
-            context.log("running: [" + args[0] + "]");
-            task.subscribe(function (event) { return context.emit(event); })
-                .run()
-                .then(function (_) { return context.ok(); })
-                .catch(function (error) { return context.fail(error); });
-        }
-    }); };
-});
-define("node/concat", ["require", "exports", "common/signature", "core/script", "fs"], function (require, exports, signature_15, script_15, fs) {
-    "use strict";
-    function concat() {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        var param = signature_15.signature(args, [
-            { pattern: ["string", "array"], map: function (args) { return ({ outputFile: args[0], sources: args[1] }); } },
-        ]);
-        return script_15.script("node/concat", function (context) {
-            try {
-                var content = param.sources.map(function (file) { return fs.readFileSync(file, "utf8"); }).join("\n");
-                fs.writeFileSync(param.outputFile, content);
-                context.ok();
-            }
-            catch (error) {
-                context.fail(error.message);
-            }
-        });
-    }
-    exports.concat = concat;
-});
-define("node/fsutil", ["require", "exports", "path", "fs"], function (require, exports, path, fs) {
-    "use strict";
-    exports.message = function (context, args) {
-        return " - " + [context, args.join(" ")].join(": ");
-    };
-    exports.error = function (context, message, path) {
+    function error(context, message, path) {
         return new Error([context, message, path].join(": "));
-    };
+    }
+    exports.error = error;
     exports.meta = function (src) {
         var exists = fs.existsSync(src);
         var stat = exists && fs.statSync(src);
@@ -970,7 +899,7 @@ define("node/fsutil", ["require", "exports", "path", "fs"], function (require, e
         }
         else {
             return {
-                type: "empty",
+                type: "not-found",
                 basename: path.basename(src),
                 dirname: path.dirname(src),
                 relname: path.normalize('./'),
@@ -978,11 +907,11 @@ define("node/fsutil", ["require", "exports", "path", "fs"], function (require, e
             };
         }
     };
-    exports.tree = function (src) {
+    function tree(src) {
         var src_info = exports.meta(src);
         switch (src_info.type) {
-            case "invalid": throw exports.error("util: tree", "src path is invalid.", src);
-            case "empty": throw exports.error("util: tree", "src exist doesn't exist.", src);
+            case "invalid": throw error("util: tree", "src path is invalid.", src);
+            case "not-found": throw error("util: tree", "src exist doesn't exist.", src);
             case "directory": break;
             case "file": break;
         }
@@ -991,7 +920,7 @@ define("node/fsutil", ["require", "exports", "path", "fs"], function (require, e
             var info = exports.meta(src);
             switch (info.type) {
                 case "invalid": break;
-                case "empty": break;
+                case "not-found": break;
                 case "file":
                     info.relname = rel;
                     buffer.push(info);
@@ -1008,48 +937,233 @@ define("node/fsutil", ["require", "exports", "path", "fs"], function (require, e
         };
         seek(src, path.normalize("./"));
         return buffer;
-    };
-    exports.build_directory = function (directory) {
+    }
+    exports.tree = tree;
+    function build_directory(directory, log) {
+        log = log || function (message) { };
         var info = exports.meta(directory);
         switch (info.type) {
             case "directory": break;
-            case "invalid": throw exports.error("util: build-directory", "directory path is invalid", directory);
-            case "file": throw exports.error("util: build-directory", "directory path points to a file.", directory);
-            case "empty":
+            case "invalid": throw error("build-directory", "directory path is invalid", directory);
+            case "file": throw error("build-directory", "directory path points to a file.", directory);
+            case "not-found":
                 var parent_1 = path.dirname(directory);
                 if (fs.existsSync(parent_1) === false)
-                    exports.build_directory(parent_1);
-                fs.mkdirSync(path.join(info.dirname, info.basename));
+                    build_directory(parent_1, log);
+                var target = path.join(info.dirname, info.basename);
+                log(["mkdir", target].join(" "));
+                fs.mkdirSync(target);
                 break;
         }
-    };
-    exports.copy_file = function (src, dst) {
-        var src_info = exports.meta(src);
-        var dst_info = exports.meta(dst);
-        switch (src_info.type) {
-            case "empty": throw exports.error("util: copy-file", "src file path doesn't exist.", src);
-            case "invalid": throw exports.error("util: copy-file", "src file path is invalid.", src);
-            case "directory": throw exports.error("util: copy-file", "attempted to link a directory", src);
+    }
+    exports.build_directory = build_directory;
+    function copy_file(src, dst, log) {
+        log = log || function (message) { };
+        var meta_src = exports.meta(src);
+        var meta_dst = exports.meta(dst);
+        switch (meta_src.type) {
+            case "invalid": throw error("copy-file", "src file path is invalid.", src);
+            case "not-found": throw error("copy-file", "src file path doesn't exist.", src);
+            case "directory": throw error("copy-file", "attempted to link a directory", src);
             case "file": break;
         }
-        switch (dst_info.type) {
-            case "directory": throw exports.error("util: copy-file", "dst file path found directory named the same.", dst);
-            case "invalid": throw exports.error("util: copy-file", "dst file path is invalid.", dst);
-            case "empty":
+        switch (meta_dst.type) {
+            case "directory": throw error("copy-file", "dst file path found directory named the same.", dst);
+            case "invalid": throw error("copy-file", "dst file path is invalid.", dst);
+            case "not-found":
             case "file":
-                exports.build_directory(dst_info.dirname);
-                var source = path.join(src_info.dirname, src_info.basename);
-                var target = path.join(dst_info.dirname, dst_info.basename);
+                build_directory(meta_dst.dirname, log);
+                var source = path.join(meta_src.dirname, meta_src.basename);
+                var target = path.join(meta_dst.dirname, meta_dst.basename);
                 if (source !== target) {
-                    if (dst_info.type === "file")
+                    if (meta_dst.type === "file") {
+                        log(["unlink", target].join(" "));
                         fs.unlinkSync(target);
+                    }
+                    log(["copy", source, target].join(" "));
                     fs.linkSync(source, target);
                 }
                 break;
         }
-    };
+    }
+    exports.copy_file = copy_file;
+    function copy(src, directory, log) {
+        log = log || function (message) { };
+        var meta_src = exports.meta(src);
+        var meta_dst = exports.meta(directory);
+        switch (meta_src.type) {
+            case "invalid": throw error("copy", "the source file or directory path is invalid", src);
+            case "not-found": throw error("copy", "the source file or directory path not found.", src);
+        }
+        switch (meta_dst.type) {
+            case "invalid": throw error("copy", "the destination directory path is invalid", directory);
+            case "file": throw error("copy", "the destination directory path points to a file", directory);
+            case "not-found":
+                build_directory(directory, log);
+                break;
+            case "directory": break;
+        }
+        var manifest = tree(src);
+        manifest.forEach(function (meta_src) {
+            switch (meta_src.type) {
+                case "invalid": throw error("copy", "invalid file or directory path.", src);
+                case "nor-found": throw error("copy", "file or directory path not found.", src);
+                case "directory":
+                    var directory_1 = path.join(meta_dst.dirname, meta_dst.basename, meta_src.relname);
+                    build_directory(directory_1, log);
+                    break;
+                case "file":
+                    var source = path.join(meta_src.dirname, meta_src.basename);
+                    var target = path.join(meta_dst.dirname, meta_dst.basename, meta_src.relname, meta_src.basename);
+                    copy_file(source, target, log);
+                    break;
+            }
+        });
+    }
+    exports.copy = copy;
+    function drop(target, log) {
+        log = log || function (message) { };
+        var meta_dst = exports.meta(target);
+        switch (meta_dst.type) {
+            case "invalid": throw error("drop", "invalid file or directory path", target);
+            case "empty": return;
+            case "file": break;
+            case "directory": break;
+        }
+        var manifest = tree(target);
+        manifest.reverse();
+        manifest.forEach(function (src_info) {
+            switch (src_info.type) {
+                case "empty": break;
+                case "invalid": break;
+                case "directory":
+                    var directory = path.join(src_info.dirname, src_info.basename);
+                    log(["rmdir", directory].join(" "));
+                    fs.rmdirSync(directory);
+                    break;
+                case "file":
+                    var filename = path.join(src_info.dirname, src_info.basename);
+                    log(["unlink", filename].join(" "));
+                    fs.unlinkSync(filename);
+            }
+        });
+    }
+    exports.drop = drop;
+    function append(target, content, log) {
+        log = log || function (message) { };
+        var meta_dst = exports.meta(target);
+        switch (meta_dst.type) {
+            case "invalid": throw error("append", "the given path is invalid", target);
+            case "directory": throw error("append", "the given path points to a directory", target);
+            case "not-found":
+                {
+                    build_directory(meta_dst.dirname, log);
+                    var filename = path.join(meta_dst.dirname, meta_dst.basename);
+                    log(["write", filename].join(" "));
+                    fs.writeFileSync(filename, content);
+                }
+                break;
+            case "file":
+                {
+                    var filename = path.join(meta_dst.dirname, meta_dst.basename);
+                    log(["append", filename].join(" "));
+                    fs.appendFileSync(filename, content);
+                }
+                break;
+        }
+    }
+    exports.append = append;
+    function concat(target, sources, log) {
+        log = log || function (message) { };
+        var meta_dst = exports.meta(target);
+        switch (meta_dst.type) {
+            case "invalid": throw error("concat", "the given path is invalid", target);
+            case "directory": throw error("concat", "the given path points to a directory", target);
+            case "not-found": break;
+            case "file": break;
+        }
+        build_directory(meta_dst.dirname, log);
+        var content = sources
+            .map(function (filename) { return path.resolve(filename); })
+            .map(function (filename) { return fs.readFileSync(filename, "utf8"); })
+            .join("\n");
+        var filename = path.join(meta_dst.dirname, meta_dst.basename);
+        log(["concat", filename].join(" "));
+        fs.writeFileSync(filename, content);
+    }
+    exports.concat = concat;
 });
-define("node/copy", ["require", "exports", "common/signature", "core/script", "node/fsutil", "path"], function (require, exports, signature_16, script_16, fsutil, path) {
+define("node/append", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_14, script_13, util, path) {
+    "use strict";
+    function append() {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        var param = signature_14.signature(args, [
+            { pattern: ["string", "string"], map: function (args) { return ({ target: args[0], content: args[1] }); } },
+        ]);
+        return script_13.script("node/append", function (context) {
+            try {
+                var target = path.resolve(param.target);
+                util.append(target, param.content, function (message) { return context.log(message); });
+                context.ok();
+            }
+            catch (error) {
+                context.fail(error.message);
+            }
+        });
+    }
+    exports.append = append;
+});
+define("node/cli", ["require", "exports", "core/script"], function (require, exports, script_14) {
+    "use strict";
+    exports.cli = function (argv, tasks) { return script_14.script("node/cli", function (context) {
+        var args = process.argv.reduce(function (acc, c, index) {
+            if (index > 1)
+                acc.push(c);
+            return acc;
+        }, []);
+        if (args.length !== 1 || tasks[args[0]] === undefined) {
+            context.log("tasks:");
+            Object.keys(tasks).forEach(function (key) { return context.log(" - ", key); });
+            context.ok();
+        }
+        else {
+            var task = tasks[args[0]];
+            context.log("running: [" + args[0] + "]");
+            task.subscribe(function (event) { return context.emit(event); })
+                .run()
+                .then(function (_) { return context.ok(); })
+                .catch(function (error) { return context.fail(error); });
+        }
+    }); };
+});
+define("node/concat", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_15, script_15, util, path) {
+    "use strict";
+    function concat() {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i - 0] = arguments[_i];
+        }
+        var param = signature_15.signature(args, [
+            { pattern: ["string", "array"], map: function (args) { return ({ output: args[0], sources: args[1] }); } },
+        ]);
+        return script_15.script("node/concat", function (context) {
+            try {
+                var output = path.resolve(param.output);
+                var sources = param.sources.map(function (source) { return path.resolve(source); });
+                util.concat(output, sources, function (message) { return context.log(message); });
+                context.ok();
+            }
+            catch (error) {
+                context.fail(error.message);
+            }
+        });
+    }
+    exports.concat = concat;
+});
+define("node/copy", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_16, script_16, util, path) {
     "use strict";
     function copy() {
         var args = [];
@@ -1057,31 +1171,13 @@ define("node/copy", ["require", "exports", "common/signature", "core/script", "n
             args[_i - 0] = arguments[_i];
         }
         var param = signature_16.signature(args, [
-            { pattern: ["string", "string"], map: function (args) { return ({ source_file_or_directory: args[0], target_directory: args[1] }); } },
+            { pattern: ["string", "string"], map: function (args) { return ({ source: args[0], target: args[1] }); } },
         ]);
         return script_16.script("node/copy", function (context) {
             try {
-                var src_1 = path.resolve(param.source_file_or_directory);
-                var dst = path.resolve(param.target_directory);
-                var dst_info_1 = fsutil.meta(dst);
-                var gather = fsutil.tree(src_1);
-                gather.forEach(function (src_info) {
-                    switch (src_info.type) {
-                        case "invalid": throw fsutil.error("copy", "invalid file or directory src path.", src_1);
-                        case "empty": throw fsutil.error("copy", "no file or directory exists at the given src.", src_1);
-                        case "directory":
-                            var directory = path.join(dst_info_1.dirname, dst_info_1.basename, src_info.relname);
-                            context.log(fsutil.message("mkdir", [directory]));
-                            fsutil.build_directory(directory);
-                            break;
-                        case "file":
-                            var source = path.join(src_info.dirname, src_info.basename);
-                            var target = path.join(dst_info_1.dirname, dst_info_1.basename, src_info.relname, src_info.basename);
-                            context.log(fsutil.message("copy", [source, target]));
-                            fsutil.copy_file(source, target);
-                            break;
-                    }
-                });
+                var source = path.resolve(param.source);
+                var target = path.resolve(param.target);
+                util.copy(source, target, function (message) { return context.log(message); });
                 context.ok();
             }
             catch (error) {
@@ -1091,7 +1187,7 @@ define("node/copy", ["require", "exports", "common/signature", "core/script", "n
     }
     exports.copy = copy;
 });
-define("node/drop", ["require", "exports", "common/signature", "core/script", "node/fsutil", "path", "fs"], function (require, exports, signature_17, script_17, fsutil, path, fs) {
+define("node/drop", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_17, script_17, util, path) {
     "use strict";
     function drop() {
         var args = [];
@@ -1099,29 +1195,12 @@ define("node/drop", ["require", "exports", "common/signature", "core/script", "n
             args[_i - 0] = arguments[_i];
         }
         var param = signature_17.signature(args, [
-            { pattern: ["string"], map: function (args) { return ({ drop_file_or_directory: args[0] }); } },
+            { pattern: ["string"], map: function (args) { return ({ target: args[0] }); } },
         ]);
         return script_17.script("node/drop", function (context) {
             try {
-                var src = path.resolve(param.drop_file_or_directory);
-                var dst_info = fsutil.meta(src);
-                var gather = fsutil.tree(src);
-                gather.reverse();
-                gather.forEach(function (src_info) {
-                    switch (src_info.type) {
-                        case "empty": break;
-                        case "invalid": break;
-                        case "directory":
-                            var directory = path.join(src_info.dirname, src_info.basename);
-                            context.log(fsutil.message("drop", [directory]));
-                            fs.rmdirSync(directory);
-                            break;
-                        case "file":
-                            var filename = path.join(src_info.dirname, src_info.basename);
-                            context.log(fsutil.message("drop", [filename]));
-                            fs.unlinkSync(filename);
-                    }
-                });
+                var target = path.resolve(param.target);
+                util.drop(target, function (message) { return context.log(message); });
                 context.ok();
             }
             catch (error) {

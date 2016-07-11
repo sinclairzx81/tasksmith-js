@@ -183,6 +183,25 @@ declare module "core/trycatch" {
     import { ITask } from "core/task";
     export function trycatch(left: () => ITask, right: () => ITask): ITask;
 }
+declare module "node/util" {
+    import * as fs from "fs";
+    export function error(context: string, message: string, path: string): Error;
+    export interface StatExtended {
+        type: "invalid" | "not-found" | "file" | "directory";
+        basename: string;
+        dirname: string;
+        relname: string;
+        stat: fs.Stats;
+    }
+    export const meta: (src: string) => StatExtended;
+    export function tree(src: string): StatExtended[];
+    export function build_directory(directory: string, log?: (message: string) => void): void;
+    export function copy_file(src: string, dst: string, log?: (message: string) => void): void;
+    export function copy(src: string, directory: string, log: (message: string) => void): void;
+    export function drop(target: string, log?: (message: string) => void): void;
+    export function append(target: string, content: string, log?: (message: string) => void): void;
+    export function concat(target: string, sources: string[], log?: (message: string) => void): void;
+}
 declare module "node/append" {
     import { ITask } from "core/task";
     export function append(target: string, content: string): ITask;
@@ -195,31 +214,15 @@ declare module "node/cli" {
 }
 declare module "node/concat" {
     import { ITask } from "core/task";
-    export function concat(outputFile: string, sources: string[]): ITask;
-}
-declare module "node/fsutil" {
-    import * as fs from "fs";
-    export const message: (context: string, args: string[]) => string;
-    export const error: (context: string, message: string, path: string) => Error;
-    export interface Meta {
-        type: "invalid" | "empty" | "file" | "directory";
-        basename: string;
-        dirname: string;
-        relname: string;
-        stat: fs.Stats;
-    }
-    export const meta: (src: string) => Meta;
-    export const tree: (src: string) => Meta[];
-    export const build_directory: (directory: string) => void;
-    export const copy_file: (src: string, dst: string) => void;
+    export function concat(output: string, sources: string[]): ITask;
 }
 declare module "node/copy" {
     import { ITask } from "core/task";
-    export function copy(source_file_or_directory: string, target_directory: string): ITask;
+    export function copy(source: string, target: string): ITask;
 }
 declare module "node/drop" {
     import { ITask } from "core/task";
-    export function drop(drop_file_or_directory: string): ITask;
+    export function drop(target: string): ITask;
 }
 declare module "node/serve" {
     import { ITask } from "core/task";

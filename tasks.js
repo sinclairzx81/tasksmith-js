@@ -67,6 +67,16 @@ const append = (file, content) => () => new Promise((resolve, reject) => {
   fs.writeFileSync(file, [ fs.readFileSync(file, "utf8"), content].join("\n"))
   resolve()
 })
+//------------------------------------------
+// (support) drops the given filename.
+//------------------------------------------
+const drop = (file) => () => new Promise((resolve, reject) => {
+  const fs = require("fs")
+  console.log("drop:", file)
+  fs.unlinkSync(file)
+  resolve()
+})
+
 
 //------------------------------------------
 // (support) creates a small cli to execute tasks.
@@ -100,7 +110,6 @@ const build_browser = () => [
   shell ("tsc ./src/tasksmith-browser.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/browser/tasksmith.js"),
 ]
 
-
 //------------------------------------------
 // (task) builds node profile.
 //------------------------------------------
@@ -109,18 +118,18 @@ const build_node = () => [
   shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/node/tasksmith.js"),
   concat("./bin/node/tasksmith.js", [ "./license",  "./bin/node/boot.js", "./bin/node/tasksmith.js" ]),
   append("./bin/node/tasksmith.js", "module.exports = collect();"),
-  shell ("rm -rf ./bin/node/boot.js")
+  drop  ("./bin/node/boot.js")
 ]
 
 //------------------------------------------
 // (task) builds the starter 
 //------------------------------------------
 const build_starter = () => [
-  shell ("tsc ./src/boot.ts           --removeComments --outFile ./starters/boot.js"),
-  shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./starters/tasksmith.js"),
-  concat("./starters/tasksmith.js", [ "./license",  "./starters/boot.js", "./starters/tasksmith.js" ]),
-  append("./starters/tasksmith.js", "module.exports = collect();"),
-  shell ("rm -rf ./starters/boot.js")
+  shell  ("tsc ./src/boot.ts           --removeComments --outFile ./starters/boot.js"),
+  shell  ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./starters/tasksmith.js"),
+  concat ("./starters/tasksmith.js", [ "./license",  "./starters/boot.js", "./starters/tasksmith.js" ]),
+  append ("./starters/tasksmith.js", "module.exports = collect();"),
+  drop   ("./starters/boot.js")
 ]
 
 //------------------------------------------
