@@ -9,7 +9,7 @@ const task = require("../tasksmith.js")
 //-------------------------------------------------------
 // install:
 //-------------------------------------------------------
-const install = () => task.series([
+const install = () => task.series(() => [
   // todo: npm dependencies here.
 ])
 

@@ -30,6 +30,10 @@ import {signature} from "../common/signature"
 import {ITask}     from "./task"
 import {script}    from "./script"
 
+export interface ParallelFunc {
+  () : Array<ITask>
+}
+
 /**
  * creates a task that runs its inner tasks in parallel.
  * @param {Array<Task>} an array of tasks to run in parallel.
@@ -44,23 +48,32 @@ export function parallel (tasks: Array<ITask>) : ITask;
  */
 export function parallel (...args: any[]) {
   let param = signature<{
-    tasks    : Array<ITask>
+    func    : ParallelFunc
   }>(args, [
-      { pattern: ["array"], map : (args) => ({ tasks: args[0]  })  },
+      { pattern: ["function"], map : (args) => ({ func: args[0]  })  },
   ])
   return script("core/parallel", context => {
     let completed: number  = 0
     let cancelled: boolean = false
+    let tasks = null
+
+    try {
+      tasks = param.func()
+    } catch(e) {
+      context.fail(e)
+      return
+    }
+    
     context.oncancel(reason => {
       cancelled = true
-      param.tasks.forEach(task => task.cancel(reason))
+      tasks.forEach(task => task.cancel(reason))
       context.fail(reason)
     })
     
-    param.tasks.forEach(task => {
+    tasks.forEach(task => {
       task.subscribe(event => context.emit(event))
           .run  ()
-          .then (()    => { completed += 1; if(completed === param.tasks.length) { context.ok() } })
+          .then (()    => { completed += 1; if(completed === tasks.length) { context.ok() } })
           .catch(error => context.fail(error))
     })
   })

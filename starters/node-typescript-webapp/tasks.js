@@ -14,14 +14,14 @@ const clean = () => task.drop("./bin")
 //-------------------------------------------------------
 // install:
 //-------------------------------------------------------
-const install = () => task.series([
+const install = () => task.series(() => [
   // todo: install npm modules.
 ])
 
 //-------------------------------------------------------
 // watch:
 //-------------------------------------------------------
-const watch = () => task.parallel([
+const watch = () => task.parallel(() => [
   task.shell("tsc -w ./src/app.ts --moduleResolution node --module commonjs --target es6 --removeComments --outDir ./bin"),
   task.shell("tsc  -w ./src/public/scripts/app.ts --target es5 --removeComments --outFile ./bin/public/scripts/app.js"),
   task.watch("./src/public/styles",     () => task.shell ("lessc ./src/public/styles/index.less ./bin/public/styles/style.css")),

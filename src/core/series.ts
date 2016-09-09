@@ -25,9 +25,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
+
 import {signature} from "../common/signature"
 import {ITask}     from "./task"
 import {script}    from "./script"
+
+/**
+ * signature for the series function.
+ */
+export interface SeriesFunc {
+  () : Array<ITask>
+}
 
 /**
  * creates a task that runs its inner tasks in series.
@@ -50,26 +58,37 @@ export function series (tasks: Array<ITask>) : ITask;
  */
 export function series (...args: any[]) : ITask {
   let param = signature<{
-    tasks   : Array<ITask>
+    func   : SeriesFunc
   }>(args, [
-      { pattern: ["array"], map : (args) => ({ tasks: args[0]  }) },
+      { pattern: ["function"], map : (args) => ({ func: args[0]  }) },
   ])
   return script("core/series", context => {
+
     let task     : ITask   = null
     let cancelled: boolean = false
+    let tasks = null
+
+    try {
+      tasks = param.func()
+    } catch(e) {
+      context.fail(e)
+      return
+    }
+
     context.oncancel(reason => {
       cancelled = true
       if(task !== null) task.cancel(reason)
       context.fail(reason)
     })
+    
     const next = () => {
       if(cancelled === true) return
-      if (param.tasks.length === 0) {
+      if (tasks.length === 0) {
         context.ok()
         return
       }
       
-      task = param.tasks.shift()
+      task = tasks.shift()
       task.subscribe(event => context.emit(event))
           .run      ()
           .then     (next)

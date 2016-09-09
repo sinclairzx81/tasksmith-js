@@ -9,7 +9,7 @@ const task = require("../tasksmith.js")
 //-------------------------------------------------------
 // install:
 //-------------------------------------------------------
-const install = () => task.series([
+const install = () => task.series(() => [
   task.shell("npm install typescript -g"),
   task.shell("npm install less -g")
 ])
@@ -17,7 +17,7 @@ const install = () => task.series([
 //-------------------------------------------------------
 // clean:
 //-------------------------------------------------------
-const clean = () =>  task.series([
+const clean = () =>  task.series(() => [
   task.drop("./scripts/app/app.js"),
   task.drop("./styles/style.css")
 ])
@@ -25,7 +25,7 @@ const clean = () =>  task.series([
 //-------------------------------------------------------
 // build:
 //-------------------------------------------------------
-const build = () => task.series([
+const build = () => task.series(() => [
   task.shell("tsc   ./scripts/app/index.ts --jsx react --target es5 --module amd --removeComments --outFile ./scripts/app/app.js"),
   task.shell("lessc ./styles/index.less ./styles/style.css"),
 ])
@@ -33,7 +33,7 @@ const build = () => task.series([
 //-------------------------------------------------------
 // watch:
 //-------------------------------------------------------
-const watch  = () => task.parallel([
+const watch  = () => task.parallel(() => [
   task.shell("tsc -w ./scripts/app/index.ts --jsx react --target es5 --module amd --removeComments --outFile ./scripts/app/app.js"),
   task.watch("./styles/", () => task.shell("lessc ./styles/index.less ./styles/style.css")),
   task.serve(".", 5000, true, 1000)

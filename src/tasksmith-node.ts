@@ -38,6 +38,7 @@ import {ok}                     from "./core/ok"
 import {parallel}               from "./core/parallel"
 import {repeat}                 from "./core/repeat"
 import {retry}                  from "./core/retry"
+import {run}                    from "./core/run"
 import {script}                 from "./core/script"
 import {series}                 from "./core/series"
 import {ITask, Task, TaskEvent} from "./core/task"
@@ -67,6 +68,7 @@ export {
   parallel,
   repeat,
   retry,
+  run,
   script,
   series,
   ITask, Task, TaskEvent,

@@ -5,12 +5,11 @@
 ```js
 const task = require('./tasksmith.js')
 
-let mytask = () => task.series([
+let mytask = task.series(() => [
   task.shell("npm install"),
   task.shell("npm start")
 ])
 
-task.debug(mytask())
 ```
 
 ## overview
@@ -38,7 +37,7 @@ All tasks emit various logging information, its possible to subscribe to the log
 the following.
 
 ```javascript
-let mytask = () => task.series([
+let mytask = () => task.series(() => [
   task.ok   ("running task 1"),
   task.ok   ("running task 2"),
   task.fail ("running task 3"),
@@ -51,7 +50,7 @@ mytask().subscribe(event => console.log(event)).run()
 the above code can be simplified with the debug function, which will write logging information out
 to the environments console.
 ```javascript
-let mytask = () => task.series([
+let mytask = () => task.series(() => [
   task.ok   ("running task 1"),
   task.ok   ("running task 2"),
   task.fail ("running task 3"),
@@ -84,7 +83,7 @@ run from within any javascript environment.
 creates a task that will delay for the given number of milliseconds.
 
 ```javascript
-let mytask = () => task.series([
+let mytask = () => task.series(() => [
   task.delay(1000),
   task.delay(1000),
   task.delay(1000)
@@ -94,7 +93,7 @@ let mytask = () => task.series([
 ### dowhile
 creates a task that repeats while a condition is true.
 ```javascript
-let mytask = () => task.dowhile(next => next(true), () => task.series([
+let mytask = () => task.dowhile(next => next(true), () => task.series(() => [
    task.ok("running 1"),
    task.ok("running 2"),
    task.ok("running 3")
@@ -104,7 +103,7 @@ let mytask = () => task.dowhile(next => next(true), () => task.series([
 ### fail
 creates a task that immediately fails.
 ```javascript
-let mytask = () => task.series([
+let mytask = () => task.series(() => [
   task.ok  ("running 1"),
   task.ok  ("running 2"),
   task.fail("running 3")
@@ -136,7 +135,7 @@ let mytask = () => task.ok()
 creates a task that runs its inner tasks in parallel.
 ```javascript
 // run concurrently
-let mytask = () => task.parallel([
+let mytask = () => task.parallel(() => [
   task.delay(1000), 
   task.delay(1000),
   task.delay(1000)
@@ -154,7 +153,7 @@ let mytask = () => task.repeat(10, () => task.ok())
 creates a retry task that attempts the inner task for the given number of retries and fail if unable to complete.
 
 ```javascript
-let mytask = () => task.retry(10, () => task.series([
+let mytask = () => task.retry(10, () => task.series(() => [
   task.ok(),
   task.ok(),
   task.fail()
@@ -177,7 +176,7 @@ let mytask = () => task.script("custom/task", context => {
 creates a task that runs its inner tasks in series.
 ```javascript
 // run sequentially.
-let mytask = () => task.series([
+let mytask = () => task.series(() => [
   task.delay(1000),
   task.delay(1000),
   task.delay(1000)
@@ -188,7 +187,7 @@ let mytask = () => task.series([
 creates a task that will fail if its inner task has not 
 completed within the given number of milliseconds.
 ```javascript
-let mytask = () => task.timeout(3000, () => task.series([
+let mytask = () => task.timeout(3000, () => task.series(() => [
   task.delay(1000),
   task.delay(1000),
   task.delay(1000), // !!!
