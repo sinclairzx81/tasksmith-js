@@ -4,7 +4,7 @@ tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
-Copyright (c) 2015-2016 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
+Copyright (c) 2015-2017 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -261,7 +261,7 @@ export function copy (src: string, directory: string, log: (message: string) => 
   manifest.forEach(meta_src => {
     switch(meta_src.type) {
       case "invalid"   : throw error("copy", "invalid file or directory path.", src)
-      case "nor-found" : throw error("copy", "file or directory path not found.", src)
+      case "not-found" : throw error("copy", "file or directory path not found.", src)
       case "directory" :
         let directory = path.join(meta_dst.dirname, meta_dst.basename, meta_src.relname)
         build_directory(directory, log)
@@ -285,10 +285,10 @@ export function drop (target: string, log?: (message: string) => void) : void {
   log = log || function(message) {}
   let meta_dst = meta  (target)
   switch(meta_dst.type) {
-    case "invalid"  : throw error("drop", "invalid file or directory path", target)
-    case "empty"    : return;
-    case "file"     :/* ok */  break;
-    case "directory": /* ok */ break;
+    case "invalid"   : throw error("drop", "invalid file or directory path", target)
+    case "not-found" : return;
+    case "file"      : /* ok */ break;
+    case "directory" : /* ok */ break;
   }
 
   //-----------------------------------------
@@ -298,8 +298,8 @@ export function drop (target: string, log?: (message: string) => void) : void {
   manifest.reverse()
   manifest.forEach(src_info => {
       switch(src_info.type) {
-        case "empty":   break;
-        case "invalid": break;
+        case "not-found": break;
+        case "invalid":   break;
         case "directory":
           let directory = path.join(src_info.dirname, src_info.basename)
           log(["rmdir", directory].join(" "))

@@ -1,4 +1,4 @@
-/// <reference path="../src/node/node.d.ts" />
+/// <reference path="../../src/node/node.d.ts" />
 declare module "common/promise" {
     export interface Reject {
         (reason: string | Error): void;
@@ -161,6 +161,9 @@ declare module "core/ifthen" {
 }
 declare module "core/parallel" {
     import { ITask } from "core/task";
+    export interface ParallelFunc {
+        (): Array<ITask>;
+    }
     export function parallel(tasks: Array<ITask>): ITask;
 }
 declare module "core/repeat" {
@@ -171,8 +174,16 @@ declare module "core/retry" {
     import { ITask } from "core/task";
     export function retry(retries: number, taskfunc: (iteration: number) => ITask): ITask;
 }
+declare module "core/run" {
+    import { Promise } from "common/promise";
+    import { ITask } from "core/task";
+    export const run: (task: ITask) => Promise<string>;
+}
 declare module "core/series" {
     import { ITask } from "core/task";
+    export interface SeriesFunc {
+        (): Array<ITask>;
+    }
     export function series(tasks: Array<ITask>): ITask;
 }
 declare module "core/timeout" {
@@ -224,12 +235,6 @@ declare module "node/drop" {
     import { ITask } from "core/task";
     export function drop(target: string): ITask;
 }
-declare module "node/serve" {
-    import { ITask } from "core/task";
-    export function serve(directory: string, port: number, watch: boolean, delay: number): ITask;
-    export function serve(directory: string, port: number, watch: boolean): ITask;
-    export function serve(directory: string, port: number): ITask;
-}
 declare module "node/shell" {
     import { ITask } from "core/task";
     export function shell(command: string, exitcode: number): ITask;
@@ -256,6 +261,7 @@ declare module "tasksmith-node" {
     import { parallel } from "core/parallel";
     import { repeat } from "core/repeat";
     import { retry } from "core/retry";
+    import { run } from "core/run";
     import { script } from "core/script";
     import { series } from "core/series";
     import { ITask, Task, TaskEvent } from "core/task";
@@ -266,8 +272,7 @@ declare module "tasksmith-node" {
     import { concat } from "node/concat";
     import { copy } from "node/copy";
     import { drop } from "node/drop";
-    import { serve } from "node/serve";
     import { shell } from "node/shell";
     import { watch } from "node/watch";
-    export { debug, delay, dowhile, fail, format, ifelse, ifthen, ok, parallel, repeat, retry, script, series, ITask, Task, TaskEvent, timeout, trycatch, append, cli, concat, copy, drop, serve, shell, watch };
+    export { debug, delay, dowhile, fail, format, ifelse, ifthen, ok, parallel, repeat, retry, run, script, series, ITask, Task, TaskEvent, timeout, trycatch, append, cli, concat, copy, drop, shell, watch };
 }

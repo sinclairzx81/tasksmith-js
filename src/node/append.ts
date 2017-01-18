@@ -4,7 +4,7 @@ tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
-Copyright (c) 2015-2016 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
+Copyright (c) 2015-2017 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

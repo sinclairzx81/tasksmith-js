@@ -4,7 +4,7 @@ tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
-Copyright (c) 2015-2016 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
+Copyright (c) 2015-2017 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,37 @@ import {signature}        from "../common/signature"
 import {ITask}            from "../core/task"
 import {script}           from "../core/script"
 import * as fs            from "fs"
+
+/**
+ * Debounce: A simple event debouncer.
+ */
+class Debounce {
+  private handle: NodeJS.Timer
+  /**
+   * creates a new debounce with the given minimal delay.
+   * @param {number} delay the minimal delay.
+   * @returns {Debounce}
+   */
+  constructor(private delay: number) {
+    this.handle = undefined
+  }
+
+  /**
+   * runs the given function. If the function
+   * is called before this debouncers delay
+   * has elapsed, the event is rerun.
+   * @param {Function} the function to run.
+   * @returns {void}
+   */
+  public run(func: Function): void {
+    if (this.handle !== undefined) {
+      clearTimeout(this.handle)
+    }
+    this.handle = setTimeout(() => {
+      func(); this.handle = undefined;
+    }, this.delay)
+  }
+}
 
 /**
  * creates a infinite task that repeats changes to the given file or directory path.
@@ -114,6 +145,7 @@ export function watch(...args: any[]) : ITask {
     let waiting  : boolean        = true
     let completed: boolean        = false;
     let cancelled: boolean        = false;
+    let debounce : Debounce       = new Debounce(200)
 
     context.oncancel(reason => {
       cancelled = true
@@ -123,6 +155,7 @@ export function watch(...args: any[]) : ITask {
     })
     
     const next = () => {
+
       if(cancelled === true) return
       /**
        * wait:
@@ -193,6 +226,8 @@ export function watch(...args: any[]) : ITask {
      * start listening:
      * sets up the fs watchers to run recursive.
      */
-    watchers = param.paths.map(path => fs.watch(path, {recursive: true}, (event, filename) => next()))
+    watchers = param.paths.map(path => fs.watch(path, {recursive: true}, (event, filename) => {
+      debounce.run(() => next())
+    }))
   })
 }

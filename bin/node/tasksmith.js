@@ -4,7 +4,7 @@ tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
-Copyright (c) 2015-2016 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
+Copyright (c) 2015-2017 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -253,7 +253,7 @@ define("core/task", ["require", "exports", "common/promise"], function (require,
                     log: function () {
                         var args = [];
                         for (var _i = 0; _i < arguments.length; _i++) {
-                            args[_i - 0] = arguments[_i];
+                            args[_i] = arguments[_i];
                         }
                         if (_this.state === "started") {
                             var data = format_arguments(args);
@@ -269,7 +269,7 @@ define("core/task", ["require", "exports", "common/promise"], function (require,
                     ok: function () {
                         var args = [];
                         for (var _i = 0; _i < arguments.length; _i++) {
-                            args[_i - 0] = arguments[_i];
+                            args[_i] = arguments[_i];
                         }
                         if (_this.state === "started") {
                             _this.state = "completed";
@@ -287,7 +287,7 @@ define("core/task", ["require", "exports", "common/promise"], function (require,
                     fail: function () {
                         var args = [];
                         for (var _i = 0; _i < arguments.length; _i++) {
-                            args[_i - 0] = arguments[_i];
+                            args[_i] = arguments[_i];
                         }
                         if (_this.state === "started") {
                             _this.state = "failed";
@@ -474,7 +474,7 @@ define("core/script", ["require", "exports", "common/signature", "core/task"], f
     function script() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_1.signature(args, [
             { pattern: ["string", "function"], map: function (args) { return ({ task: args[0], func: args[1] }); } },
@@ -489,7 +489,7 @@ define("core/ok", ["require", "exports", "common/signature", "core/script"], fun
     function ok() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_2.signature(args, [
             { pattern: ["string"], map: function (args) { return ({ message: args[0] }); } },
@@ -504,7 +504,7 @@ define("core/delay", ["require", "exports", "common/signature", "core/script", "
     function delay() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_3.signature(args, [
             { pattern: ["number", "function"], map: function (args) { return ({ ms: args[0], taskfunc: args[1] }); } },
@@ -535,7 +535,7 @@ define("core/dowhile", ["require", "exports", "common/signature", "core/script"]
     function dowhile() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_4.signature(args, [
             { pattern: ["function", "function"], map: function (args) { return ({ condition: args[0], taskfunc: args[1] }); } },
@@ -568,7 +568,7 @@ define("core/fail", ["require", "exports", "common/signature", "core/script"], f
     function fail() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_5.signature(args, [
             { pattern: ["string"], map: function (args) { return ({ message: args[0] }); } },
@@ -583,7 +583,7 @@ define("core/ifelse", ["require", "exports", "common/signature", "core/script"],
     function ifelse() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_6.signature(args, [
             { pattern: ["function", "function", "function"], map: function (args) { return ({ condition: args[0], left: args[1], right: args[2] }); } },
@@ -615,7 +615,7 @@ define("core/ifthen", ["require", "exports", "common/signature", "core/script"],
     function ifthen() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_7.signature(args, [
             { pattern: ["function", "function"], map: function (args) { return ({ condition: args[0], taskfunc: args[1] }); } },
@@ -651,23 +651,31 @@ define("core/parallel", ["require", "exports", "common/signature", "core/script"
     function parallel() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_8.signature(args, [
-            { pattern: ["array"], map: function (args) { return ({ tasks: args[0] }); } },
+            { pattern: ["function"], map: function (args) { return ({ func: args[0] }); } },
         ]);
         return script_7.script("core/parallel", function (context) {
             var completed = 0;
             var cancelled = false;
+            var tasks = null;
+            try {
+                tasks = param.func();
+            }
+            catch (e) {
+                context.fail(e);
+                return;
+            }
             context.oncancel(function (reason) {
                 cancelled = true;
-                param.tasks.forEach(function (task) { return task.cancel(reason); });
+                tasks.forEach(function (task) { return task.cancel(reason); });
                 context.fail(reason);
             });
-            param.tasks.forEach(function (task) {
+            tasks.forEach(function (task) {
                 task.subscribe(function (event) { return context.emit(event); })
                     .run()
-                    .then(function () { completed += 1; if (completed === param.tasks.length) {
+                    .then(function () { completed += 1; if (completed === tasks.length) {
                     context.ok();
                 } })
                     .catch(function (error) { return context.fail(error); });
@@ -681,7 +689,7 @@ define("core/repeat", ["require", "exports", "common/signature", "core/script"],
     function repeat() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_9.signature(args, [
             { pattern: ["number", "function"], map: function (args) { return ({ iterations: args[0], taskfunc: args[1] }); } },
@@ -722,7 +730,7 @@ define("core/retry", ["require", "exports", "common/signature", "core/script"], 
     function retry() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_10.signature(args, [
             { pattern: ["number", "function"], map: function (args) { return ({ retries: args[0], taskfunc: args[1] }); } },
@@ -758,19 +766,34 @@ define("core/retry", ["require", "exports", "common/signature", "core/script"], 
     }
     exports.retry = retry;
 });
+define("core/run", ["require", "exports"], function (require, exports) {
+    "use strict";
+    exports.run = function (task) { return task.subscribe(function (event) {
+        if (event.data.trim().length > 0)
+            console.log(event.data);
+    }).run(); };
+});
 define("core/series", ["require", "exports", "common/signature", "core/script"], function (require, exports, signature_11, script_10) {
     "use strict";
     function series() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_11.signature(args, [
-            { pattern: ["array"], map: function (args) { return ({ tasks: args[0] }); } },
+            { pattern: ["function"], map: function (args) { return ({ func: args[0] }); } },
         ]);
         return script_10.script("core/series", function (context) {
             var task = null;
             var cancelled = false;
+            var tasks = null;
+            try {
+                tasks = param.func();
+            }
+            catch (e) {
+                context.fail(e);
+                return;
+            }
             context.oncancel(function (reason) {
                 cancelled = true;
                 if (task !== null)
@@ -780,11 +803,11 @@ define("core/series", ["require", "exports", "common/signature", "core/script"],
             var next = function () {
                 if (cancelled === true)
                     return;
-                if (param.tasks.length === 0) {
+                if (tasks.length === 0) {
                     context.ok();
                     return;
                 }
-                task = param.tasks.shift();
+                task = tasks.shift();
                 task.subscribe(function (event) { return context.emit(event); })
                     .run()
                     .then(next)
@@ -800,7 +823,7 @@ define("core/timeout", ["require", "exports", "common/signature", "core/script"]
     function timeout() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_12.signature(args, [
             { pattern: ["number", "function"], map: function (args) { return ({ ms: args[0], taskfunc: args[1] }); } },
@@ -828,7 +851,7 @@ define("core/trycatch", ["require", "exports", "common/signature", "core/script"
     function trycatch() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_13.signature(args, [
             { pattern: ["function", "function"], map: function (args) { return ({ left: args[0], right: args[1] }); } },
@@ -1007,7 +1030,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
         manifest.forEach(function (meta_src) {
             switch (meta_src.type) {
                 case "invalid": throw error("copy", "invalid file or directory path.", src);
-                case "nor-found": throw error("copy", "file or directory path not found.", src);
+                case "not-found": throw error("copy", "file or directory path not found.", src);
                 case "directory":
                     var directory_1 = path.join(meta_dst.dirname, meta_dst.basename, meta_src.relname);
                     build_directory(directory_1, log);
@@ -1026,7 +1049,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
         var meta_dst = exports.meta(target);
         switch (meta_dst.type) {
             case "invalid": throw error("drop", "invalid file or directory path", target);
-            case "empty": return;
+            case "not-found": return;
             case "file": break;
             case "directory": break;
         }
@@ -1034,7 +1057,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
         manifest.reverse();
         manifest.forEach(function (src_info) {
             switch (src_info.type) {
-                case "empty": break;
+                case "not-found": break;
                 case "invalid": break;
                 case "directory":
                     var directory = path.join(src_info.dirname, src_info.basename);
@@ -1098,7 +1121,7 @@ define("node/append", ["require", "exports", "common/signature", "core/script", 
     function append() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_14.signature(args, [
             { pattern: ["string", "string"], map: function (args) { return ({ target: args[0], content: args[1] }); } },
@@ -1144,7 +1167,7 @@ define("node/concat", ["require", "exports", "common/signature", "core/script", 
     function concat() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_15.signature(args, [
             { pattern: ["string", "array"], map: function (args) { return ({ output: args[0], sources: args[1] }); } },
@@ -1168,7 +1191,7 @@ define("node/copy", ["require", "exports", "common/signature", "core/script", "n
     function copy() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_16.signature(args, [
             { pattern: ["string", "string"], map: function (args) { return ({ source: args[0], target: args[1] }); } },
@@ -1192,7 +1215,7 @@ define("node/drop", ["require", "exports", "common/signature", "core/script", "n
     function drop() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
         var param = signature_17.signature(args, [
             { pattern: ["string"], map: function (args) { return ({ target: args[0] }); } },
@@ -1210,177 +1233,18 @@ define("node/drop", ["require", "exports", "common/signature", "core/script", "n
     }
     exports.drop = drop;
 });
-define("node/serve", ["require", "exports", "common/signature", "core/script", "http", "fs", "path", "url"], function (require, exports, signature_18, script_18, http, fs, path, url) {
-    "use strict";
-    var signals_client_script = function () { return "\n<script type=\"text/javascript\">\n\nwindow.addEventListener(\"load\", function() {\n  //---------------------------------\n  // tasksmith: signals\n  //---------------------------------\n  function connect(handler) {\n    var xhr = new XMLHttpRequest();\n    var idx = 0;\n    xhr.addEventListener(\"readystatechange\", function(event) {\n      switch(xhr.readyState) {\n        case 4: handler(\"disconnect\"); break;\n        case 3:\n          var signal = xhr.response.substr(idx);\n          idx += signal.length;\n          handler(signal);\n          break;\n      }\n    });\n    xhr.open(\"GET\", \"/__signals\", true); \n    xhr.send();\n  }\n  function handler(signal) {\n    switch(signal) {\n      case \"established\": console.log(\"signals: established\");  break;\n      case \"reload\"     : window.location.reload(); break;\n      case \"ping\"       : break;    \n      case \"disconnect\":\n        console.log(\"signals: disconnected\");\n        setTimeout(function() {\n          console.log(\"signals: reconnecting...\");\n          connect(handler)\n        }, 1000) \n        break;\n    }\n  }\n  connect(handler)\n})\n</script>\n"; };
-    var inject_signals_script = function (content) {
-        var inject_index = content.length;
-        var watch_prefix = content.slice(0, inject_index);
-        var watch_content = signals_client_script();
-        var watch_postfix = content.slice(inject_index);
-        content = [
-            watch_prefix,
-            watch_content,
-            watch_postfix
-        ].join("");
-        return content;
-    };
-    function serve() {
-        var args = [];
-        for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
-        }
-        var param = signature_18.signature(args, [
-            { pattern: ["string", "number", "boolean", "number"], map: function (args) { return ({ directory: args[0], port: args[1], watch: args[2], delay: args[3] }); } },
-            { pattern: ["string", "number", "boolean"], map: function (args) { return ({ directory: args[0], port: args[1], watch: args[2], delay: 0 }); } },
-            { pattern: ["string", "number"], map: function (args) { return ({ directory: args[0], port: args[1], watch: false, delay: 0 }); } }
-        ]);
-        return script_18.script("node/serve", function (context) {
-            var clients = [];
-            var listening = false;
-            var cancelled = false;
-            var waiting = true;
-            var server = null;
-            var watcher = null;
-            if (param.watch === true) {
-                watcher = fs.watch(param.directory, { recursive: true }, function (event, filename) {
-                    if (cancelled === true)
-                        return;
-                    if (waiting === true) {
-                        waiting = false;
-                        setTimeout(function () {
-                            clients.forEach(function (client) { return client("reload"); });
-                            setTimeout(function () { return waiting = true; }, 100);
-                        }, param.delay);
-                    }
-                });
-            }
-            server = http.createServer(function (request, response) {
-                switch (request.url) {
-                    case "/__signals":
-                        {
-                            context.log("SIG: client connected.");
-                            response.setHeader('Connection', 'Transfer-Encoding');
-                            response.setHeader('Content-Type', 'text/html; charset=utf-8');
-                            response.setHeader('Transfer-Encoding', 'chunked');
-                            response.write("established");
-                            var client_1 = function (signal) {
-                                context.log("SIG: " + signal);
-                                response.write(signal);
-                            };
-                            clients.push(client_1);
-                            var keep_alive_1 = setInterval(function () {
-                                response.write("ping");
-                            }, 15000);
-                            var request_ = request;
-                            request_.connection.on("end", function () {
-                                clearInterval(keep_alive_1);
-                                clients = clients.splice(clients.indexOf(client_1), 1);
-                                context.log("SIG: client disconnected");
-                            });
-                        }
-                        break;
-                    default: {
-                        var resolved = path.resolve("./", param.directory) + "\\";
-                        var safeurl = request.url.replace(new RegExp("\\.\\.", 'g'), "");
-                        var uri = url.parse(safeurl);
-                        var resource_1 = path.join(resolved, uri.pathname);
-                        resource_1 = resource_1.replace(new RegExp("\\\\", 'g'), "/");
-                        if (resource_1.lastIndexOf("/") === (resource_1.length - 1))
-                            resource_1 = resource_1 + "index.html";
-                        resource_1 = path.normalize(resource_1);
-                        var content_type = "application/octet-stream";
-                        switch (path.extname(resource_1)) {
-                            case ".js":
-                                content_type = "text/javascript";
-                                break;
-                            case ".css":
-                                content_type = "text/css";
-                                break;
-                            case ".json":
-                                content_type = "application/json";
-                                break;
-                            case ".png":
-                                content_type = "image/png";
-                                break;
-                            case ".jpeg":
-                            case ".jpg":
-                                content_type = "image/jpg";
-                                break;
-                            case ".wav":
-                                content_type = "audio/wav";
-                                break;
-                            case ".mp4":
-                                content_type = "video/mp4";
-                                break;
-                            case ".mp3":
-                                content_type = "audio/mpeg";
-                                break;
-                            case ".htm":
-                            case ".html":
-                                content_type = "text/html";
-                                break;
-                        }
-                        fs.stat(resource_1, function (err, stat) {
-                            if (err) {
-                                response.writeHead(404, { "Content-Type": "text/plain" });
-                                response.end("404 - not found", "utf-8");
-                                return;
-                            }
-                            if (stat.isDirectory()) {
-                                response.writeHead(404, { "Content-Type": "text/plain" });
-                                response.end("403 - forbidden", "utf-8");
-                                return;
-                            }
-                            switch (content_type) {
-                                case "text/html":
-                                    context.log(request.method + ": " + request.url);
-                                    fs.readFile(resource_1, "utf8", function (error, content) {
-                                        content = (param.watch === true) ? inject_signals_script(content) : content;
-                                        response.writeHead(200, { "Content-Type": content_type });
-                                        response.end(content, "utf-8");
-                                    });
-                                    break;
-                                default:
-                                    context.log(request.method + ": " + request.url);
-                                    var readstream = fs.createReadStream(resource_1);
-                                    readstream.pipe(response);
-                                    break;
-                            }
-                        });
-                    }
-                }
-            }).listen(param.port, function (error) {
-                if (error) {
-                    context.fail(error.message);
-                    return;
-                }
-                listening = true;
-            });
-            context.oncancel(function (reason) {
-                cancelled = true;
-                if (server !== null && listening === true)
-                    server.close();
-                if (watcher !== null && param.watch === true)
-                    watcher.close();
-                context.fail(reason);
-            });
-        });
-    }
-    exports.serve = serve;
-});
-define("node/shell", ["require", "exports", "common/signature", "core/script", "child_process", "child_process"], function (require, exports, signature_19, script_19, child_process_1, child_process_2) {
+define("node/shell", ["require", "exports", "common/signature", "core/script", "child_process", "child_process"], function (require, exports, signature_18, script_18, child_process_1, child_process_2) {
     "use strict";
     function shell() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
-        var param = signature_19.signature(args, [
+        var param = signature_18.signature(args, [
             { pattern: ["string", "number"], map: function (args) { return ({ command: args[0], exitcode: args[1] }); } },
             { pattern: ["string"], map: function (args) { return ({ command: args[0], exitcode: 0 }); } },
         ]);
-        return script_19.script("node/shell", function (context) {
+        return script_18.script("node/shell", function (context) {
             var windows = /^win/.test(process.platform);
             var child = child_process_1.spawn(windows ? 'cmd' : 'sh', [windows ? '/c' : '-c', param.command]);
             var cancelled = false;
@@ -1418,14 +1282,31 @@ define("node/shell", ["require", "exports", "common/signature", "core/script", "
     }
     exports.shell = shell;
 });
-define("node/watch", ["require", "exports", "common/signature", "core/script", "fs"], function (require, exports, signature_20, script_20, fs) {
+define("node/watch", ["require", "exports", "common/signature", "core/script", "fs"], function (require, exports, signature_19, script_19, fs) {
     "use strict";
+    var Debounce = (function () {
+        function Debounce(delay) {
+            this.delay = delay;
+            this.handle = undefined;
+        }
+        Debounce.prototype.run = function (func) {
+            var _this = this;
+            if (this.handle !== undefined) {
+                clearTimeout(this.handle);
+            }
+            this.handle = setTimeout(function () {
+                func();
+                _this.handle = undefined;
+            }, this.delay);
+        };
+        return Debounce;
+    }());
     function watch() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
-        var param = signature_20.signature(args, [
+        var param = signature_19.signature(args, [
             { pattern: ["array", "number", "boolean", "function"], map: function (args) { return ({ paths: args[0], delay: args[1], immediate: args[2], taskfunc: args[3] }); } },
             { pattern: ["array", "number", "function"], map: function (args) { return ({ paths: args[0], delay: args[1], immediate: true, taskfunc: args[2] }); } },
             { pattern: ["array", "function"], map: function (args) { return ({ paths: args[0], delay: 1000, immediate: true, taskfunc: args[1] }); } },
@@ -1433,12 +1314,13 @@ define("node/watch", ["require", "exports", "common/signature", "core/script", "
             { pattern: ["string", "number", "function"], map: function (args) { return ({ paths: [args[0]], delay: args[1], immediate: true, taskfunc: args[2] }); } },
             { pattern: ["string", "function"], map: function (args) { return ({ paths: [args[0]], delay: 1000, immediate: true, taskfunc: args[1] }); } }
         ]);
-        return script_20.script("node/watch", function (context) {
+        return script_19.script("node/watch", function (context) {
             var task = null;
             var watchers = null;
             var waiting = true;
             var completed = false;
             var cancelled = false;
+            var debounce = new Debounce(200);
             context.oncancel(function (reason) {
                 cancelled = true;
                 if (watchers !== null)
@@ -1467,12 +1349,14 @@ define("node/watch", ["require", "exports", "common/signature", "core/script", "
             };
             if (param.immediate === true)
                 next();
-            watchers = param.paths.map(function (path) { return fs.watch(path, { recursive: true }, function (event, filename) { return next(); }); });
+            watchers = param.paths.map(function (path) { return fs.watch(path, { recursive: true }, function (event, filename) {
+                debounce.run(function () { return next(); });
+            }); });
         });
     }
     exports.watch = watch;
 });
-define("tasksmith-node", ["require", "exports", "core/debug", "core/delay", "core/dowhile", "core/fail", "core/format", "core/ifelse", "core/ifthen", "core/ok", "core/parallel", "core/repeat", "core/retry", "core/script", "core/series", "core/task", "core/timeout", "core/trycatch", "node/append", "node/cli", "node/concat", "node/copy", "node/drop", "node/serve", "node/shell", "node/watch"], function (require, exports, debug_1, delay_1, dowhile_1, fail_1, format_2, ifelse_1, ifthen_1, ok_2, parallel_1, repeat_1, retry_1, script_21, series_1, task_2, timeout_1, trycatch_1, append_1, cli_1, concat_1, copy_1, drop_1, serve_1, shell_1, watch_1) {
+define("tasksmith-node", ["require", "exports", "core/debug", "core/delay", "core/dowhile", "core/fail", "core/format", "core/ifelse", "core/ifthen", "core/ok", "core/parallel", "core/repeat", "core/retry", "core/run", "core/script", "core/series", "core/task", "core/timeout", "core/trycatch", "node/append", "node/cli", "node/concat", "node/copy", "node/drop", "node/shell", "node/watch"], function (require, exports, debug_1, delay_1, dowhile_1, fail_1, format_2, ifelse_1, ifthen_1, ok_2, parallel_1, repeat_1, retry_1, run_1, script_20, series_1, task_2, timeout_1, trycatch_1, append_1, cli_1, concat_1, copy_1, drop_1, shell_1, watch_1) {
     "use strict";
     exports.debug = debug_1.debug;
     exports.delay = delay_1.delay;
@@ -1485,7 +1369,8 @@ define("tasksmith-node", ["require", "exports", "core/debug", "core/delay", "cor
     exports.parallel = parallel_1.parallel;
     exports.repeat = repeat_1.repeat;
     exports.retry = retry_1.retry;
-    exports.script = script_21.script;
+    exports.run = run_1.run;
+    exports.script = script_20.script;
     exports.series = series_1.series;
     exports.Task = task_2.Task;
     exports.timeout = timeout_1.timeout;
@@ -1495,7 +1380,6 @@ define("tasksmith-node", ["require", "exports", "core/debug", "core/delay", "cor
     exports.concat = concat_1.concat;
     exports.copy = copy_1.copy;
     exports.drop = drop_1.drop;
-    exports.serve = serve_1.serve;
     exports.shell = shell_1.shell;
     exports.watch = watch_1.watch;
 });

@@ -4,7 +4,7 @@ tasksmith - task automation library for node.
 
 The MIT License (MIT)
 
-Copyright (c) 2015-2016 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
+Copyright (c) 2015-2017 Haydn Paterson (sinclair) <haydn.developer@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -114,23 +114,14 @@ const build_browser = () => [
 // (task) builds node profile.
 //------------------------------------------
 const build_node = () => [
-  shell ("tsc ./src/boot.ts        --removeComments --outFile ./bin/node/boot.js"),
+  shell ("tsc ./src/boot.ts --removeComments --outFile ./bin/node/boot.js"),
   shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/node/tasksmith.js"),
   concat("./bin/node/tasksmith.js", [ "./license",  "./bin/node/boot.js", "./bin/node/tasksmith.js" ]),
   append("./bin/node/tasksmith.js", "module.exports = collect();"),
   drop  ("./bin/node/boot.js")
 ]
 
-//------------------------------------------
-// (task) builds the starter 
-//------------------------------------------
-const build_starter = () => [
-  shell  ("tsc ./src/boot.ts           --removeComments --outFile ./starters/boot.js"),
-  shell  ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./starters/tasksmith.js"),
-  concat ("./starters/tasksmith.js", [ "./license",  "./starters/boot.js", "./starters/tasksmith.js" ]),
-  append ("./starters/tasksmith.js", "module.exports = collect();"),
-  drop   ("./starters/boot.js")
-]
+
 
 //------------------------------------------
 // (task) builds everything.
@@ -141,7 +132,6 @@ const build = () => build_browser().concat(build_node())
 cli(process.argv, {
   "build-node"    : build_node(),
   "build-browser" : build_browser(),
-  "build-starter" : build_starter(),
   "build"         : build(),
   "clean"         : clean()
 })()

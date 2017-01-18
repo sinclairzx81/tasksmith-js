@@ -239,17 +239,6 @@ creates a task that recursively deletes a file or directory.
 let mytask = () => task.drop( "./file_or_directory")
 ```
 
-### serve
-
-creates a task that serves static content over http for the given directory and port.
-
-note: the third parameter is an optional flag to run the task in watch mode. In watch mode,
-the task will provide live reload functionality on changes to the directory being served.
-
-```javascript
-let mytask = () => task.serve("./website", 5000, true)
-```
-
 ### shell
 
 creates a task that executes a shell command.
