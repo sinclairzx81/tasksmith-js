@@ -242,7 +242,9 @@ let mytask = () => task.copy( "./file_or_directory", "./target_directory")
 creates a task that downloads a http resource and saves it as the given filename.
 
 ```javascript
-let mytask = () => task.download("https://cdnjs.cloudflare.com/ajax/libs/three.js/r83/three.js", "./scripts/three/three.js")
+let mytask = () => task.download(
+  "https://cdnjs.cloudflare.com/ajax/libs/three.js/r83/three.js", 
+  "./scripts/three/three.js")
 ```
 
 ### drop
