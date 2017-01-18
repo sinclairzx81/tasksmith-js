@@ -34,8 +34,11 @@ THE SOFTWARE.
 // files. support for copy, drop, append and concat.
 //------------------------------------------------------
 
-import * as path from "path"
-import * as fs   from "fs"
+import * as http  from "http"
+import * as https from "https"
+import * as url   from "url"
+import * as path  from "path"
+import * as fs    from "fs"
 
 /**
  * constructs a error type in a consistent format.
@@ -145,11 +148,11 @@ export function tree (src:string): StatExtended[] {
 /**
  * recursively builds a directory tree for the given directory path.
  * if a directory already exists, no action is taken, otherwise create.
- * @param {string} the directory path to build.
+ * @param {string} directory the directory path to build.
  * @param {(message:string) => void} optional logging function.
  * @returns {void}
  */
-export function build_directory (directory: string, log?: (message: string) => void): void {
+export function mkdir (directory: string, log?: (message: string) => void): void {
   log = log || function(message) {}
   const info = meta(directory)
   switch(info.type) {
@@ -158,10 +161,30 @@ export function build_directory (directory: string, log?: (message: string) => v
     case "file"      : throw error("build-directory", "directory path points to a file.", directory)
     case "not-found" :
       let parent = path.dirname(directory)
-      if(fs.existsSync(parent) === false) build_directory(parent, log)
+      if(fs.existsSync(parent) === false) mkdir(parent, log)
       let target = path.join(info.dirname, info.basename)
       log(["mkdir", target].join(" "))
       fs.mkdirSync(target)
+      break
+  }
+}
+
+/**
+ * creates a file, if the file already exists, no action.
+ * @param {string} filepath the filename to create.
+ * @param {(message:string) => void} optional logging function.
+ * @returns {void}
+ */
+export function touch (filepath: string, log?: (message: string) => void): void {
+  log = log || function(message) {}
+  mkdir( path.dirname (filepath), log)
+  let info = meta(filepath)
+  switch(info.type) {
+    case "directory" : throw error("touch", "found directory at filepath", filepath)
+    case "invalid"   : throw error("touch", "filepath is invalid",         filepath)
+    case "file"      : return
+    case "not-found" :
+      fs.openSync(filepath, 'a')
       break
   }
 }
@@ -179,10 +202,8 @@ export function copy_file (src: string, dst : string, log?: (message: string) =>
   log = log || function(message) {}
   const meta_src = meta(src)
   const meta_dst = meta(dst)
-
-  //-----------------------------------------
+  
   // validate the source file.
-  //-----------------------------------------  
   switch(meta_src.type) {
     case "invalid"  : throw error("copy-file", "src file path is invalid.",     src) 
     case "not-found": throw error("copy-file", "src file path doesn't exist.",  src)
@@ -190,29 +211,22 @@ export function copy_file (src: string, dst : string, log?: (message: string) =>
     case "file": /* ok */ break;
   }
 
-  //-----------------------------------------
   // validate destination file.
-  //-----------------------------------------
   switch(meta_dst.type) {
     case "directory": throw error("copy-file", "dst file path found directory named the same.", dst)
     case "invalid"  : throw error("copy-file", "dst file path is invalid.",                     dst) 
     case "not-found":
     case "file":
-        //-------------------------------------------------------
         // ensure the directory exists.
-        //-------------------------------------------------------
-        build_directory(meta_dst.dirname, log) 
+        mkdir(meta_dst.dirname, log) 
         let source = path.join(meta_src.dirname, meta_src.basename)
         let target = path.join(meta_dst.dirname, meta_dst.basename)
         
-        //--------------------------------------------------------
         // if the source and destination are the same, do nothing.
-        //--------------------------------------------------------
         if(source !== target) {
-          //-----------------------------------------------
+
           // if the file already exists, we need to unlink
           // it and replace it wil the file being copied.
-          //-----------------------------------------------
           if(meta_dst.type === "file") {
             log(["unlink", target].join(" "))
             fs.unlinkSync (target)
@@ -236,27 +250,21 @@ export function copy (src: string, directory: string, log: (message: string) => 
   let meta_src = meta(src)
   let meta_dst = meta(directory)
 
-  //-----------------------------------------
   // validate the source file or directory.
-  //-----------------------------------------
   switch(meta_src.type) {
     case "invalid"   : throw error("copy", "the source file or directory path is invalid", src)
     case "not-found" : throw error("copy", "the source file or directory path not found.", src) 
   }
 
-  //-----------------------------------------
   // validate the destination directory.
-  //-----------------------------------------  
   switch(meta_dst.type) {
     case "invalid"  : throw error("copy", "the destination directory path is invalid",       directory)
     case "file"     : throw error("copy", "the destination directory path points to a file", directory)
-    case "not-found": build_directory(directory, log); break;
+    case "not-found": mkdir(directory, log); break;
     case "directory": /* ok */ break;
   }
 
-  //-----------------------------------------
   // obtain manifest and copy
-  //-----------------------------------------
   let manifest = tree(src)
   manifest.forEach(meta_src => {
     switch(meta_src.type) {
@@ -264,7 +272,7 @@ export function copy (src: string, directory: string, log: (message: string) => 
       case "not-found" : throw error("copy", "file or directory path not found.", src)
       case "directory" :
         let directory = path.join(meta_dst.dirname, meta_dst.basename, meta_src.relname)
-        build_directory(directory, log)
+        mkdir(directory, log)
         break;
       case "file":
         let source = path.join(meta_src.dirname, meta_src.basename)
@@ -291,9 +299,7 @@ export function drop (target: string, log?: (message: string) => void) : void {
     case "directory" : /* ok */ break;
   }
 
-  //-----------------------------------------
   // obtain manifest, reverse it and delete.
-  //-----------------------------------------
   let manifest = tree  (target)
   manifest.reverse()
   manifest.forEach(src_info => {
@@ -328,21 +334,15 @@ export function append(target: string, content: string, log?: (message: string) 
     case "invalid"  : throw error("append", "the given path is invalid", target)
     case "directory": throw error("append", "the given path points to a directory", target)
     case "not-found": {
-      //-------------------------------------------------------
       // ensure the directory exists.
-      //-------------------------------------------------------
-      build_directory(meta_dst.dirname, log)
-      //-------------------------------------------------------
+      mkdir(meta_dst.dirname, log)
       // create the file with the given content.
-      //-------------------------------------------------------    
       let filename = path.join(meta_dst.dirname, meta_dst.basename)
       log(["write", filename].join(" "))
       fs.writeFileSync(filename, content)
     } break;
     case "file": {
-      //-------------------------------------------------------
       // append the content.
-      //-------------------------------------------------------
       let filename = path.join(meta_dst.dirname, meta_dst.basename)
       log(["append", filename].join(" "))
       fs.appendFileSync(filename, content)  
@@ -366,23 +366,53 @@ export function concat (target: string, sources: string[], log?: (message: strin
     case "not-found" : /* ok */ break;
     case "file"      : /* ok */ break;   
   }
-  //-------------------------------------------------------
-  // ensure the directory exists.
-  //-------------------------------------------------------
-  build_directory(meta_dst.dirname, log)
 
-  //-------------------------------------------------------
+  // ensure the directory exists.
+  mkdir(meta_dst.dirname, log)
+
   // gather source contents and concatinate.
-  //-------------------------------------------------------  
   let content = sources
                 .map(filename => path.resolve(filename))
                 .map(filename => fs.readFileSync(filename, "utf8"))
                 .join("\n")
   
-  //-------------------------------------------------------
   // write the file..
-  //-------------------------------------------------------                  
   let filename = path.join(meta_dst.dirname, meta_dst.basename)
   log(["concat", filename].join(" "))
   fs.writeFileSync(filename, content)
+}
+
+/**
+ * downloads a resource from the given uri.
+ * @param {string} uri the uri to download.
+ * @param {string} filepath the filepath to download to.
+ * @param {(message:string) => void} optional logging function.
+ * @returns {void}
+ */
+export function download(uri: string, filepath: string, log?: (message: string) => void) : Promise<any> {
+  log = log || function(message) {}
+  
+  // http request downloader.
+  const process = (proto: typeof http, uri, filepath) => new Promise((resolve, reject) => {
+    proto.get(uri, response => {
+      if(response.statusCode !== 200) {
+        reject(new Error(`statusCode ${response.statusCode}`))
+        return
+      }
+      let writestream = fs.createWriteStream(filepath)
+      response.pipe(writestream)
+        .on("error", error => reject(error))
+        .on("end",   ()    => resolve())
+    }).on("error", error => reject(error))
+  })
+
+  // create target directory.
+  mkdir( path.dirname (filepath), log)
+
+  // process based on protocol,
+  switch(url.parse(uri).protocol) {
+    case "http:":  return process(http, uri, filepath)
+    case "https:": return process(<typeof http><any>https, uri, filepath)
+    default: Promise.reject("unknown protocol")
+  }
 }

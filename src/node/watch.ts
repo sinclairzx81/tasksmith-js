@@ -139,14 +139,14 @@ export function watch(...args: any[]) : ITask {
       { pattern: ["string", "number", "function"],             map : (args) => ({ paths: [args[0]], delay: args[1], immediate: true,    taskfunc: args[2]  }) },
       { pattern: ["string", "function"],                       map : (args) => ({ paths: [args[0]], delay: 1000,    immediate: true,    taskfunc: args[1]  }) }
   ])
+  
   return script("node/watch", context => {
     let task     : ITask          = null
     let watchers : fs.FSWatcher[] = null
-    let waiting  : boolean        = true
     let completed: boolean        = false;
     let cancelled: boolean        = false;
     let debounce : Debounce       = new Debounce(200)
-
+    
     context.oncancel(reason => {
       cancelled = true
       if(watchers !== null) watchers.forEach(watcher => watcher.close())
@@ -155,62 +155,42 @@ export function watch(...args: any[]) : ITask {
     })
     
     const next = () => {
-
       if(cancelled === true) return
-      /**
-       * wait:
-       * The file system is liable to signal
-       * hundreds of change events in quick 
-       * succession.
-       * 
-       * Here we check if we are waiting on
-       * a signal, and if so, set the waiting
-       * flag to false.
-       */
-      if(waiting === true) {
-        context.log("watch change detected.")
-        waiting = false;
-        
-        /**
-         * waiting timeout:
-         * We set a timeout to switch the waiting
-         * flag back to true. This timeout is tied
-         * back to the delay parameter passed by 
-         * the caller.
-         */
-        setTimeout(() => {waiting = true}, param.delay)
 
-        /**
-         * cancel:
-         * A task may still be running when we receive
-         * the change signal. Because of this, there is
-         * a need to cancel to previous task before 
-         * starting a new one. This prevents multiple
-         * concurrent (and ultimately orphaned tasks)
-         * from being lost.
-         */
-        if(task !== null && completed === false) {
-          task.cancel("watch cancelled task.")
-        }
-        
-        /**
-         * execute and allow errors:
-         * execute the task. We have a special case
-         * here with regards to handling errors on the 
-         * inner task. 
-         * 
-         * Essentially we say its ok for the inner task 
-         * to have errors. The reason is, we do not wish
-         * a watcher to fail due to its inner task failing,
-         * instead, we want the watcher to re-run the task.
-         */
-        completed = false
-        task      = param.taskfunc()
-        task.subscribe(event => context.emit(event))
-            .run()
-            .then(()  => {completed = true})
-            .catch(() => {completed = true})
+      /**
+       * emit watcher change detected message.
+       */
+      context.log("watch change detected.")
+
+      /**
+       * cancel:
+       * A task may still be running when we receive
+       * the change signal. Because of this, there is
+       * a need to cancel to previous task before 
+       * starting a new one. This prevents multiple
+       * concurrent (and ultimately orphaned tasks)
+       * from being lost.
+       */
+      if(task !== null && completed === false) {
+        task.cancel("watch cancelled task.")
       }
+      
+      /**
+       * execute and allow errors:
+       * 
+       * execute the task. We have a special case
+       * here with regards to handling errors on the 
+       * inner task. essentially we say its ok for the inner task 
+       * to have errors. The reason is, we do not wish
+       * a watcher to fail due to its inner task failing,
+       * instead, we want the watcher to re-run the task.
+       */
+      completed = false
+      task      = param.taskfunc()
+      task.subscribe(event => context.emit(event))
+        .run()
+        .then(()  => {completed = true})
+        .catch(() => {completed = true})
     }
     
     /**
@@ -220,14 +200,15 @@ export function watch(...args: any[]) : ITask {
      * the file system. In this instance, just 
      * kick off a the first task.
      */
-    if(param.immediate === true) next()
-    
+    if(param.immediate === true) {
+      next()
+    }
+
     /**
-     * start listening:
-     * sets up the fs watchers to run recursive.
+     * runs the watchers.
      */
-    watchers = param.paths.map(path => fs.watch(path, {recursive: true}, (event, filename) => {
-      debounce.run(() => next())
-    }))
+    watchers = param.paths.map(path => fs.watch(path, {recursive: true}, 
+      (event, filename) => debounce.run(() => next())
+    ))
   })
 }

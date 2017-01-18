@@ -26,7 +26,6 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {Promise}                             from "../common/promise"
 import {signature}                           from "../common/signature"
 import {ITask, Task, TaskContext, TaskEvent} from "./task"
 

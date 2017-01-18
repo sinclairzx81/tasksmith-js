@@ -10,17 +10,23 @@ let mytask = task.series(() => [
   task.shell("npm start")
 ])
 
+mytask.run()
+  .then(()     => console.log("ok"))
+  .catch(error => console.log(error))
+
 ```
 
 ## overview
 
-tasksmith is a no dependency build automation library written for node. This library enables developers
-to compose sophisticated asynchronous workflows from small reusable tasks.
+tasksmith is a zero dependency build automation tool for nodejs. tasksmith was primarily written
+to allow for programatic orchestration of various command line utilities, particularly development time 
+tooling (compilers, bundlers, minifiers, etc), but to also provide some directory / file provisioning 
+services.
 
 ## building from source
 ```
 npm install typescript -g
-node tasks build-all
+node tasks build
 ```
 ## running tasks
 
@@ -231,6 +237,14 @@ creates a task that recursively copies a file or directory into a target directo
 let mytask = () => task.copy( "./file_or_directory", "./target_directory")
 ```
 
+### download
+
+creates a task that downloads a http resource and saves it as the given filename.
+
+```javascript
+let mytask = () => task.download("https://cdnjs.cloudflare.com/ajax/libs/three.js/r83/three.js", "./scripts/three/three.js")
+```
+
 ### drop
 
 creates a task that recursively deletes a file or directory.
@@ -239,12 +253,29 @@ creates a task that recursively deletes a file or directory.
 let mytask = () => task.drop( "./file_or_directory")
 ```
 
+### mkdir
+
+creates a task that provisions a directory for use. if the directory already exists, no action is taken. directories are built 
+recursively.
+
+```javascript
+let mytask = () => task.mkdir( "./some/directory")
+```
+
 ### shell
 
 creates a task that executes a shell command.
 
 ```javascript
 let mytask = () => task.shell("npm install typescipt")
+```
+
+### touch
+
+creates a empty file with the given path, if the file already exists, no action.
+
+```javascript
+let mytask = () => task.touch("./scripts/index.js")
 ```
 
 ### watch

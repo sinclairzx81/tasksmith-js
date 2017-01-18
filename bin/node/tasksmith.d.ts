@@ -1,38 +1,5 @@
 /// <reference path="../../src/node/node.d.ts" />
-declare module "common/promise" {
-    export interface Reject {
-        (reason: string | Error): void;
-    }
-    export interface Resolve<T> {
-        (value: T): void;
-    }
-    export interface Executor<T> {
-        (resolve: Resolve<T>, reject: Reject): void;
-    }
-    export interface Thenable<T> {
-        then<U>(onfulfilled: (value: T) => U | Thenable<U>, onrejected?: (reason: string | Error) => void): Thenable<U>;
-        catch<U>(onrejected: (reason: string | Error) => U | Thenable<U>): Thenable<U>;
-    }
-    export class Promise<T> implements Thenable<T> {
-        private executor;
-        private value_callbacks;
-        private error_callbacks;
-        state: "pending" | "fulfilled" | "rejected";
-        value: T;
-        error: string | Error;
-        constructor(executor: Executor<T>);
-        then<U>(onfulfilled: (value: T) => U | Thenable<U>, onrejected?: (reason: string | Error) => void): Thenable<U>;
-        catch<U>(onrejected: (reason: string | Error) => U | Thenable<U>): Thenable<U>;
-        static all<T>(thenables: Thenable<T>[]): Thenable<T[]>;
-        static race<T>(thenables: Thenable<T>[]): Thenable<T>;
-        static resolve<T>(value: T | Thenable<T>): Thenable<T>;
-        static reject<T>(reason: string | Error): Thenable<T>;
-        private _resolve(value);
-        private _reject(reason);
-    }
-}
 declare module "core/task" {
-    import { Promise } from "common/promise";
     export class TaskCancellation {
         private state;
         private subscribers;
@@ -97,7 +64,6 @@ declare module "core/format" {
     export const format: (event: any) => string;
 }
 declare module "core/debug" {
-    import { Promise } from "common/promise";
     import { ITask } from "core/task";
     export const debug: (task: ITask) => Promise<string>;
 }
@@ -175,7 +141,6 @@ declare module "core/retry" {
     export function retry(retries: number, taskfunc: (iteration: number) => ITask): ITask;
 }
 declare module "core/run" {
-    import { Promise } from "common/promise";
     import { ITask } from "core/task";
     export const run: (task: ITask) => Promise<string>;
 }
@@ -206,12 +171,14 @@ declare module "node/util" {
     }
     export const meta: (src: string) => StatExtended;
     export function tree(src: string): StatExtended[];
-    export function build_directory(directory: string, log?: (message: string) => void): void;
+    export function mkdir(directory: string, log?: (message: string) => void): void;
+    export function touch(filepath: string, log?: (message: string) => void): void;
     export function copy_file(src: string, dst: string, log?: (message: string) => void): void;
     export function copy(src: string, directory: string, log: (message: string) => void): void;
     export function drop(target: string, log?: (message: string) => void): void;
     export function append(target: string, content: string, log?: (message: string) => void): void;
     export function concat(target: string, sources: string[], log?: (message: string) => void): void;
+    export function download(uri: string, filepath: string, log?: (message: string) => void): Promise<any>;
 }
 declare module "node/append" {
     import { ITask } from "core/task";
@@ -231,14 +198,26 @@ declare module "node/copy" {
     import { ITask } from "core/task";
     export function copy(source: string, target: string): ITask;
 }
+declare module "node/download" {
+    import { ITask } from "core/task";
+    export function download(uri: string, filepath: string): ITask;
+}
 declare module "node/drop" {
     import { ITask } from "core/task";
     export function drop(target: string): ITask;
+}
+declare module "node/mkdir" {
+    import { ITask } from "core/task";
+    export function mkdir(target: string): ITask;
 }
 declare module "node/shell" {
     import { ITask } from "core/task";
     export function shell(command: string, exitcode: number): ITask;
     export function shell(command: string): ITask;
+}
+declare module "node/touch" {
+    import { ITask } from "core/task";
+    export function touch(filename: string): ITask;
 }
 declare module "node/watch" {
     import { ITask } from "core/task";
@@ -271,8 +250,11 @@ declare module "tasksmith-node" {
     import { cli } from "node/cli";
     import { concat } from "node/concat";
     import { copy } from "node/copy";
+    import { download } from "node/download";
     import { drop } from "node/drop";
+    import { mkdir } from "node/mkdir";
     import { shell } from "node/shell";
+    import { touch } from "node/touch";
     import { watch } from "node/watch";
-    export { debug, delay, dowhile, fail, format, ifelse, ifthen, ok, parallel, repeat, retry, run, script, series, ITask, Task, TaskEvent, timeout, trycatch, append, cli, concat, copy, drop, shell, watch };
+    export { debug, delay, dowhile, fail, format, ifelse, ifthen, ok, parallel, repeat, retry, run, script, series, ITask, Task, TaskEvent, timeout, trycatch, append, cli, concat, copy, download, drop, mkdir, shell, touch, watch };
 }

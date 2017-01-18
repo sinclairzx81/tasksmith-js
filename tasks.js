@@ -107,7 +107,7 @@ const clean = () => [ shell("rm -rf ./bin") ]
 // (task) builds browser profile.
 //------------------------------------------
 const build_browser = () => [
-  shell ("tsc ./src/tasksmith-browser.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/browser/tasksmith.js"),
+  shell ("tsc ./src/tasksmith-browser.ts --removeComments --module amd --target es5 --lib es2015,dom --declaration --outFile ./bin/browser/tasksmith.js"),
 ]
 
 //------------------------------------------
@@ -115,7 +115,7 @@ const build_browser = () => [
 //------------------------------------------
 const build_node = () => [
   shell ("tsc ./src/boot.ts --removeComments --outFile ./bin/node/boot.js"),
-  shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --declaration --outFile ./bin/node/tasksmith.js"),
+  shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --lib es2015,dom --declaration --outFile ./bin/node/tasksmith.js"),
   concat("./bin/node/tasksmith.js", [ "./license",  "./bin/node/boot.js", "./bin/node/tasksmith.js" ]),
   append("./bin/node/tasksmith.js", "module.exports = collect();"),
   drop  ("./bin/node/boot.js")

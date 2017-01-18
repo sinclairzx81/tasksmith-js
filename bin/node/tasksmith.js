@@ -47,141 +47,7 @@ var define = function (id, dependencies, factory) {
     return definitions.push({ id: id, dependencies: dependencies, factory: factory });
 };
 
-define("common/promise", ["require", "exports"], function (require, exports) {
-    "use strict";
-    var Promise = (function () {
-        function Promise(executor) {
-            var _this = this;
-            this.executor = executor;
-            this.value_callbacks = [];
-            this.error_callbacks = [];
-            this.state = "pending";
-            this.value = null;
-            this.error = null;
-            try {
-                this.executor(function (value) { return _this._resolve(value); }, function (error) { return _this._reject(error); });
-            }
-            catch (error) {
-                this._reject(error);
-            }
-        }
-        Promise.prototype.then = function (onfulfilled, onrejected) {
-            var _this = this;
-            return new Promise(function (resolve, reject) {
-                switch (_this.state) {
-                    case "rejected":
-                        if (onrejected !== undefined)
-                            onrejected(_this.error);
-                        reject(_this.error);
-                        break;
-                    case "fulfilled":
-                        var result = onfulfilled(_this.value);
-                        if (result instanceof Promise)
-                            result.then(resolve).catch(reject);
-                        else
-                            resolve(result);
-                        break;
-                    case "pending":
-                        _this.error_callbacks.push(function (error) {
-                            if (onrejected !== undefined)
-                                onrejected(error);
-                            reject(error);
-                        });
-                        _this.value_callbacks.push(function (value) {
-                            var result = onfulfilled(value);
-                            if (result instanceof Promise)
-                                result.then(resolve).catch(reject);
-                            else
-                                resolve(result);
-                        });
-                        break;
-                }
-            });
-        };
-        Promise.prototype.catch = function (onrejected) {
-            var _this = this;
-            return new Promise(function (resolve, reject) {
-                switch (_this.state) {
-                    case "fulfilled": break;
-                    case "rejected":
-                        var result = onrejected(_this.error);
-                        if (result instanceof Promise)
-                            result.then(resolve).catch(reject);
-                        else
-                            resolve(result);
-                        break;
-                    case "pending":
-                        _this.error_callbacks.push(function (error) {
-                            var result = onrejected(_this.error);
-                            if (result instanceof Promise)
-                                result.then(resolve).catch(reject);
-                            else
-                                resolve(result);
-                        });
-                        break;
-                }
-            });
-        };
-        Promise.all = function (thenables) {
-            return new Promise(function (resolve, reject) {
-                if (thenables.length === 0) {
-                    resolve([]);
-                }
-                else {
-                    var results = new Array(thenables.length);
-                    var completed = 0;
-                    thenables.forEach(function (thenable, index) {
-                        return thenable.then(function (value) {
-                            results[index] = value;
-                            completed += 1;
-                            if (completed === thenables.length)
-                                resolve(results);
-                        }).catch(reject);
-                    });
-                }
-            });
-        };
-        Promise.race = function (thenables) {
-            return new Promise(function (resolve, reject) {
-                thenables.forEach(function (promise, index) {
-                    promise.then(resolve).catch(reject);
-                });
-            });
-        };
-        Promise.resolve = function (value) {
-            return new Promise(function (resolve, reject) {
-                if (value instanceof Promise)
-                    value.then(resolve).catch(reject);
-                else
-                    resolve(value);
-            });
-        };
-        Promise.reject = function (reason) {
-            return new Promise(function (_, reject) { return reject(reason); });
-        };
-        Promise.prototype._resolve = function (value) {
-            if (this.state === "pending") {
-                this.state = "fulfilled";
-                this.value = value;
-                this.error_callbacks = [];
-                while (this.value_callbacks.length > 0)
-                    this.value_callbacks.shift()(this.value);
-            }
-        };
-        Promise.prototype._reject = function (reason) {
-            if (this.state === "pending") {
-                this.state = "rejected";
-                this.error = reason;
-                this.value_callbacks = [];
-                while (this.error_callbacks.length > 0)
-                    this.error_callbacks.shift()(this.error);
-            }
-        };
-        return Promise;
-    }());
-    exports.Promise = Promise;
-});
-define("core/task", ["require", "exports", "common/promise"], function (require, exports, promise_1) {
+define("core/task", ["require", "exports"], function (require, exports) {
     "use strict";
     var format_arguments = function (args) {
         if (args === null || args === undefined)
@@ -235,7 +101,7 @@ define("core/task", ["require", "exports", "common/promise"], function (require,
             var _this = this;
             if (this.state !== "pending")
                 throw Error("cannot run a task more than once.");
-            return new promise_1.Promise(function (resolve, reject) {
+            return new Promise(function (resolve, reject) {
                 _this.state = "started";
                 _this._notify({
                     id: _this.id,
@@ -884,7 +750,7 @@ define("core/trycatch", ["require", "exports", "common/signature", "core/script"
     }
     exports.trycatch = trycatch;
 });
-define("node/util", ["require", "exports", "path", "fs"], function (require, exports, path, fs) {
+define("node/util", ["require", "exports", "http", "https", "url", "path", "fs"], function (require, exports, http, https, url, path, fs) {
     "use strict";
     function error(context, message, path) {
         return new Error([context, message, path].join(": "));
@@ -962,7 +828,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
         return buffer;
     }
     exports.tree = tree;
-    function build_directory(directory, log) {
+    function mkdir(directory, log) {
         log = log || function (message) { };
         var info = exports.meta(directory);
         switch (info.type) {
@@ -972,14 +838,28 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
             case "not-found":
                 var parent_1 = path.dirname(directory);
                 if (fs.existsSync(parent_1) === false)
-                    build_directory(parent_1, log);
+                    mkdir(parent_1, log);
                 var target = path.join(info.dirname, info.basename);
                 log(["mkdir", target].join(" "));
                 fs.mkdirSync(target);
                 break;
         }
     }
-    exports.build_directory = build_directory;
+    exports.mkdir = mkdir;
+    function touch(filepath, log) {
+        log = log || function (message) { };
+        mkdir(path.dirname(filepath), log);
+        var info = exports.meta(filepath);
+        switch (info.type) {
+            case "directory": throw error("touch", "found directory at filepath", filepath);
+            case "invalid": throw error("touch", "filepath is invalid", filepath);
+            case "file": return;
+            case "not-found":
+                fs.openSync(filepath, 'a');
+                break;
+        }
+    }
+    exports.touch = touch;
     function copy_file(src, dst, log) {
         log = log || function (message) { };
         var meta_src = exports.meta(src);
@@ -995,7 +875,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
             case "invalid": throw error("copy-file", "dst file path is invalid.", dst);
             case "not-found":
             case "file":
-                build_directory(meta_dst.dirname, log);
+                mkdir(meta_dst.dirname, log);
                 var source = path.join(meta_src.dirname, meta_src.basename);
                 var target = path.join(meta_dst.dirname, meta_dst.basename);
                 if (source !== target) {
@@ -1022,7 +902,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
             case "invalid": throw error("copy", "the destination directory path is invalid", directory);
             case "file": throw error("copy", "the destination directory path points to a file", directory);
             case "not-found":
-                build_directory(directory, log);
+                mkdir(directory, log);
                 break;
             case "directory": break;
         }
@@ -1033,7 +913,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
                 case "not-found": throw error("copy", "file or directory path not found.", src);
                 case "directory":
                     var directory_1 = path.join(meta_dst.dirname, meta_dst.basename, meta_src.relname);
-                    build_directory(directory_1, log);
+                    mkdir(directory_1, log);
                     break;
                 case "file":
                     var source = path.join(meta_src.dirname, meta_src.basename);
@@ -1080,7 +960,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
             case "directory": throw error("append", "the given path points to a directory", target);
             case "not-found":
                 {
-                    build_directory(meta_dst.dirname, log);
+                    mkdir(meta_dst.dirname, log);
                     var filename = path.join(meta_dst.dirname, meta_dst.basename);
                     log(["write", filename].join(" "));
                     fs.writeFileSync(filename, content);
@@ -1105,7 +985,7 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
             case "not-found": break;
             case "file": break;
         }
-        build_directory(meta_dst.dirname, log);
+        mkdir(meta_dst.dirname, log);
         var content = sources
             .map(function (filename) { return path.resolve(filename); })
             .map(function (filename) { return fs.readFileSync(filename, "utf8"); })
@@ -1115,6 +995,28 @@ define("node/util", ["require", "exports", "path", "fs"], function (require, exp
         fs.writeFileSync(filename, content);
     }
     exports.concat = concat;
+    function download(uri, filepath, log) {
+        log = log || function (message) { };
+        var process = function (proto, uri, filepath) { return new Promise(function (resolve, reject) {
+            proto.get(uri, function (response) {
+                if (response.statusCode !== 200) {
+                    reject(new Error("statusCode " + response.statusCode));
+                    return;
+                }
+                var writestream = fs.createWriteStream(filepath);
+                response.pipe(writestream)
+                    .on("error", function (error) { return reject(error); })
+                    .on("end", function () { return resolve(); });
+            }).on("error", function (error) { return reject(error); });
+        }); };
+        mkdir(path.dirname(filepath), log);
+        switch (url.parse(uri).protocol) {
+            case "http:": return process(http, uri, filepath);
+            case "https:": return process(https, uri, filepath);
+            default: Promise.reject("unknown protocol");
+        }
+    }
+    exports.download = download;
 });
 define("node/append", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_14, script_13, util, path) {
     "use strict";
@@ -1210,17 +1112,42 @@ define("node/copy", ["require", "exports", "common/signature", "core/script", "n
     }
     exports.copy = copy;
 });
-define("node/drop", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_17, script_17, util, path) {
+define("node/download", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_17, script_17, util, path) {
+    "use strict";
+    function download() {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var param = signature_17.signature(args, [
+            { pattern: ["string", "string"], map: function (args) { return ({ uri: args[0], filepath: args[1] }); } },
+        ]);
+        return script_17.script("node/download", function (context) {
+            try {
+                var filepath = path.resolve(param.filepath);
+                context.log("downloading " + param.uri + " to " + filepath);
+                util.download(param.uri, filepath, function (message) { return context.log(message); })
+                    .then(function () { return context.ok(); })
+                    .catch(function (error) { return context.fail(error); });
+            }
+            catch (error) {
+                context.fail(error.message);
+            }
+        });
+    }
+    exports.download = download;
+});
+define("node/drop", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_18, script_18, util, path) {
     "use strict";
     function drop() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        var param = signature_17.signature(args, [
+        var param = signature_18.signature(args, [
             { pattern: ["string"], map: function (args) { return ({ target: args[0] }); } },
         ]);
-        return script_17.script("node/drop", function (context) {
+        return script_18.script("node/drop", function (context) {
             try {
                 var target = path.resolve(param.target);
                 util.drop(target, function (message) { return context.log(message); });
@@ -1233,18 +1160,42 @@ define("node/drop", ["require", "exports", "common/signature", "core/script", "n
     }
     exports.drop = drop;
 });
-define("node/shell", ["require", "exports", "common/signature", "core/script", "child_process", "child_process"], function (require, exports, signature_18, script_18, child_process_1, child_process_2) {
+define("node/mkdir", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_19, script_19, util, path) {
+    "use strict";
+    function mkdir() {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var param = signature_19.signature(args, [
+            { pattern: ["string"], map: function (args) { return ({ target: args[0] }); } },
+        ]);
+        return script_19.script("node/mkdir", function (context) {
+            try {
+                var target = path.resolve(param.target);
+                context.log(target);
+                util.mkdir(target, function (message) { return context.log(message); });
+                context.ok();
+            }
+            catch (error) {
+                context.fail(error.message);
+            }
+        });
+    }
+    exports.mkdir = mkdir;
+});
+define("node/shell", ["require", "exports", "common/signature", "core/script", "child_process", "child_process"], function (require, exports, signature_20, script_20, child_process_1, child_process_2) {
     "use strict";
     function shell() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        var param = signature_18.signature(args, [
+        var param = signature_20.signature(args, [
             { pattern: ["string", "number"], map: function (args) { return ({ command: args[0], exitcode: args[1] }); } },
             { pattern: ["string"], map: function (args) { return ({ command: args[0], exitcode: 0 }); } },
         ]);
-        return script_18.script("node/shell", function (context) {
+        return script_20.script("node/shell", function (context) {
             var windows = /^win/.test(process.platform);
             var child = child_process_1.spawn(windows ? 'cmd' : 'sh', [windows ? '/c' : '-c', param.command]);
             var cancelled = false;
@@ -1282,7 +1233,31 @@ define("node/shell", ["require", "exports", "common/signature", "core/script", "
     }
     exports.shell = shell;
 });
-define("node/watch", ["require", "exports", "common/signature", "core/script", "fs"], function (require, exports, signature_19, script_19, fs) {
+define("node/touch", ["require", "exports", "common/signature", "core/script", "node/util", "path"], function (require, exports, signature_21, script_21, util, path) {
+    "use strict";
+    function touch() {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+        }
+        var param = signature_21.signature(args, [
+            { pattern: ["string"], map: function (args) { return ({ filename: args[0] }); } },
+        ]);
+        return script_21.script("node/touch", function (context) {
+            try {
+                var filename = path.resolve(param.filename);
+                context.log(filename);
+                util.touch(filename, function (message) { return context.log(message); });
+                context.ok();
+            }
+            catch (error) {
+                context.fail(error.message);
+            }
+        });
+    }
+    exports.touch = touch;
+});
+define("node/watch", ["require", "exports", "common/signature", "core/script", "fs"], function (require, exports, signature_22, script_22, fs) {
     "use strict";
     var Debounce = (function () {
         function Debounce(delay) {
@@ -1306,7 +1281,7 @@ define("node/watch", ["require", "exports", "common/signature", "core/script", "
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i] = arguments[_i];
         }
-        var param = signature_19.signature(args, [
+        var param = signature_22.signature(args, [
             { pattern: ["array", "number", "boolean", "function"], map: function (args) { return ({ paths: args[0], delay: args[1], immediate: args[2], taskfunc: args[3] }); } },
             { pattern: ["array", "number", "function"], map: function (args) { return ({ paths: args[0], delay: args[1], immediate: true, taskfunc: args[2] }); } },
             { pattern: ["array", "function"], map: function (args) { return ({ paths: args[0], delay: 1000, immediate: true, taskfunc: args[1] }); } },
@@ -1314,10 +1289,9 @@ define("node/watch", ["require", "exports", "common/signature", "core/script", "
             { pattern: ["string", "number", "function"], map: function (args) { return ({ paths: [args[0]], delay: args[1], immediate: true, taskfunc: args[2] }); } },
             { pattern: ["string", "function"], map: function (args) { return ({ paths: [args[0]], delay: 1000, immediate: true, taskfunc: args[1] }); } }
         ]);
-        return script_19.script("node/watch", function (context) {
+        return script_22.script("node/watch", function (context) {
             var task = null;
             var watchers = null;
-            var waiting = true;
             var completed = false;
             var cancelled = false;
             var debounce = new Debounce(200);
@@ -1332,31 +1306,26 @@ define("node/watch", ["require", "exports", "common/signature", "core/script", "
             var next = function () {
                 if (cancelled === true)
                     return;
-                if (waiting === true) {
-                    context.log("watch change detected.");
-                    waiting = false;
-                    setTimeout(function () { waiting = true; }, param.delay);
-                    if (task !== null && completed === false) {
-                        task.cancel("watch cancelled task.");
-                    }
-                    completed = false;
-                    task = param.taskfunc();
-                    task.subscribe(function (event) { return context.emit(event); })
-                        .run()
-                        .then(function () { completed = true; })
-                        .catch(function () { completed = true; });
+                context.log("watch change detected.");
+                if (task !== null && completed === false) {
+                    task.cancel("watch cancelled task.");
                 }
+                completed = false;
+                task = param.taskfunc();
+                task.subscribe(function (event) { return context.emit(event); })
+                    .run()
+                    .then(function () { completed = true; })
+                    .catch(function () { completed = true; });
             };
-            if (param.immediate === true)
+            if (param.immediate === true) {
                 next();
-            watchers = param.paths.map(function (path) { return fs.watch(path, { recursive: true }, function (event, filename) {
-                debounce.run(function () { return next(); });
-            }); });
+            }
+            watchers = param.paths.map(function (path) { return fs.watch(path, { recursive: true }, function (event, filename) { return debounce.run(function () { return next(); }); }); });
         });
     }
     exports.watch = watch;
 });
-define("tasksmith-node", ["require", "exports", "core/debug", "core/delay", "core/dowhile", "core/fail", "core/format", "core/ifelse", "core/ifthen", "core/ok", "core/parallel", "core/repeat", "core/retry", "core/run", "core/script", "core/series", "core/task", "core/timeout", "core/trycatch", "node/append", "node/cli", "node/concat", "node/copy", "node/drop", "node/shell", "node/watch"], function (require, exports, debug_1, delay_1, dowhile_1, fail_1, format_2, ifelse_1, ifthen_1, ok_2, parallel_1, repeat_1, retry_1, run_1, script_20, series_1, task_2, timeout_1, trycatch_1, append_1, cli_1, concat_1, copy_1, drop_1, shell_1, watch_1) {
+define("tasksmith-node", ["require", "exports", "core/debug", "core/delay", "core/dowhile", "core/fail", "core/format", "core/ifelse", "core/ifthen", "core/ok", "core/parallel", "core/repeat", "core/retry", "core/run", "core/script", "core/series", "core/task", "core/timeout", "core/trycatch", "node/append", "node/cli", "node/concat", "node/copy", "node/download", "node/drop", "node/mkdir", "node/shell", "node/touch", "node/watch"], function (require, exports, debug_1, delay_1, dowhile_1, fail_1, format_2, ifelse_1, ifthen_1, ok_2, parallel_1, repeat_1, retry_1, run_1, script_23, series_1, task_2, timeout_1, trycatch_1, append_1, cli_1, concat_1, copy_1, download_1, drop_1, mkdir_1, shell_1, touch_1, watch_1) {
     "use strict";
     exports.debug = debug_1.debug;
     exports.delay = delay_1.delay;
@@ -1370,7 +1339,7 @@ define("tasksmith-node", ["require", "exports", "core/debug", "core/delay", "cor
     exports.repeat = repeat_1.repeat;
     exports.retry = retry_1.retry;
     exports.run = run_1.run;
-    exports.script = script_20.script;
+    exports.script = script_23.script;
     exports.series = series_1.series;
     exports.Task = task_2.Task;
     exports.timeout = timeout_1.timeout;
@@ -1379,8 +1348,11 @@ define("tasksmith-node", ["require", "exports", "core/debug", "core/delay", "cor
     exports.cli = cli_1.cli;
     exports.concat = concat_1.concat;
     exports.copy = copy_1.copy;
+    exports.download = download_1.download;
     exports.drop = drop_1.drop;
+    exports.mkdir = mkdir_1.mkdir;
     exports.shell = shell_1.shell;
+    exports.touch = touch_1.touch;
     exports.watch = watch_1.watch;
 });
 

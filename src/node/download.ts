@@ -26,12 +26,43 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {ITask}      from "./task"
-import {format}     from "./format"
+/// <reference path="./node.d.ts" />
+
+import {signature} from "../common/signature"
+import {ITask}     from "../core/task"
+import {script}    from "../core/script"
+import * as util   from "./util"
+import * as path   from "path"
 
 /**
- * debugs a task by invoking the task and writing its output to the environment console.
- * @param {ITask} the task to debug.
- * returns {ITask}
+ * creates a task that downloads a resource from the given uri.
+ * @param {string} uri the url to the resource.
+ * @param {string} filepath the filepath to save this resource as. 
+ * @returns {ITask}
  */
-export const debug = (task: ITask): Promise<string> => task.subscribe(event => console.log(format(event))).run()
+export function download(uri: string, filepath: string) : ITask
+
+/**
+ * creates a task that downloads a resource from the given uri.
+ * @param {any[]} arguments.
+ * @returns {ITask}
+ */
+export function download (...args: any[]) : ITask {
+  let param = signature<{
+    uri     : string
+    filepath: string
+  }>(args, [
+    { pattern: ["string", "string"], map : (args) => ({ uri: args[0], filepath: args[1] })  },
+  ])
+  return script("node/download", context => {
+    try {
+      let filepath = path.resolve(param.filepath)
+      context.log(`downloading ${param.uri} to ${filepath}`)
+      util.download(param.uri, filepath, message => context.log(message))
+          .then (()    => context.ok())
+          .catch(error => context.fail(error))
+    } catch (error) {
+      context.fail(error.message)
+    }
+  })
+}

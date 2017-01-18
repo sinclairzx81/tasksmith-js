@@ -50,8 +50,11 @@ import {append}                 from "./node/append"
 import {cli}                    from "./node/cli"
 import {concat}                 from "./node/concat"
 import {copy}                   from "./node/copy"
+import {download}               from "./node/download"
 import {drop}                   from "./node/drop"
+import {mkdir}                  from "./node/mkdir"
 import {shell}                  from "./node/shell"
+import {touch}                  from "./node/touch"
 import {watch}                  from "./node/watch"
 
 export {
@@ -79,7 +82,10 @@ export {
   cli,
   concat,
   copy,
+  download,
   drop,
+  mkdir,
   shell,
+  touch,
   watch
 }

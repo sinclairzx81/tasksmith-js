@@ -26,7 +26,6 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {Promise}    from "../common/promise"
 import {ITask}      from "./task"
 import {format}     from "./format"
 

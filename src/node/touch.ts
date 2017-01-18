@@ -26,12 +26,44 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {ITask}      from "./task"
-import {format}     from "./format"
+/// <reference path="./node.d.ts" />
+
+import {signature} from "../common/signature"
+import {ITask}     from "../core/task"
+import {script}    from "../core/script"
+import * as util   from "./util"
+import * as path   from "path"
+
+import * as url    from "url"
+import * as http   from "http"
+import * as https  from "https"
 
 /**
- * debugs a task by invoking the task and writing its output to the environment console.
- * @param {ITask} the task to debug.
- * returns {ITask}
+ * creates a empty file with the given path, if the file already exists, no action.
+ * @param {string} filename the filename to save this resource as. 
+ * @returns {ITask}
  */
-export const debug = (task: ITask): Promise<string> => task.subscribe(event => console.log(format(event))).run()
+export function touch(filename: string) : ITask
+
+/**
+ * creates a empty file with the given path, if the file already exists, no action.
+ * @param {any[]} arguments.
+ * @returns {ITask}
+ */
+export function touch(...args: any[]) : ITask {
+  let param = signature<{
+    filename: string
+  }>(args, [
+    { pattern: ["string"], map : (args) => ({ filename: args[0] })  },
+  ])
+  return script("node/touch", context => {
+    try {
+      let filename = path.resolve(param.filename)
+      context.log(filename)
+      util.touch(filename, message => context.log(message))
+      context.ok()
+    } catch (error) {
+      context.fail(error.message)
+    }
+  })
+}

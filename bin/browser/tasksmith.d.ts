@@ -1,37 +1,4 @@
-declare module "common/promise" {
-    export interface Reject {
-        (reason: string | Error): void;
-    }
-    export interface Resolve<T> {
-        (value: T): void;
-    }
-    export interface Executor<T> {
-        (resolve: Resolve<T>, reject: Reject): void;
-    }
-    export interface Thenable<T> {
-        then<U>(onfulfilled: (value: T) => U | Thenable<U>, onrejected?: (reason: string | Error) => void): Thenable<U>;
-        catch<U>(onrejected: (reason: string | Error) => U | Thenable<U>): Thenable<U>;
-    }
-    export class Promise<T> implements Thenable<T> {
-        private executor;
-        private value_callbacks;
-        private error_callbacks;
-        state: "pending" | "fulfilled" | "rejected";
-        value: T;
-        error: string | Error;
-        constructor(executor: Executor<T>);
-        then<U>(onfulfilled: (value: T) => U | Thenable<U>, onrejected?: (reason: string | Error) => void): Thenable<U>;
-        catch<U>(onrejected: (reason: string | Error) => U | Thenable<U>): Thenable<U>;
-        static all<T>(thenables: Thenable<T>[]): Thenable<T[]>;
-        static race<T>(thenables: Thenable<T>[]): Thenable<T>;
-        static resolve<T>(value: T | Thenable<T>): Thenable<T>;
-        static reject<T>(reason: string | Error): Thenable<T>;
-        private _resolve(value);
-        private _reject(reason);
-    }
-}
 declare module "core/task" {
-    import { Promise } from "common/promise";
     export class TaskCancellation {
         private state;
         private subscribers;
@@ -96,7 +63,6 @@ declare module "core/format" {
     export const format: (event: any) => string;
 }
 declare module "core/debug" {
-    import { Promise } from "common/promise";
     import { ITask } from "core/task";
     export const debug: (task: ITask) => Promise<string>;
 }
@@ -174,7 +140,6 @@ declare module "core/retry" {
     export function retry(retries: number, taskfunc: (iteration: number) => ITask): ITask;
 }
 declare module "core/run" {
-    import { Promise } from "common/promise";
     import { ITask } from "core/task";
     export const run: (task: ITask) => Promise<string>;
 }

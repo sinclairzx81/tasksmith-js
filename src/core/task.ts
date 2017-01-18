@@ -26,8 +26,6 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {Promise} from "../common/promise"
-
 /**
  * formats variable length arguments on behalf of the task context.
  * @param {any[]} arguments

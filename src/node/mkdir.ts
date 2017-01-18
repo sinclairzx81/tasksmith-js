@@ -26,12 +26,40 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {ITask}      from "./task"
-import {format}     from "./format"
+/// <reference path="./node.d.ts" />
+
+import {signature} from "../common/signature"
+import {ITask}     from "../core/task"
+import {script}    from "../core/script"
+import * as util   from "./util"
+import * as path   from "path"
 
 /**
- * debugs a task by invoking the task and writing its output to the environment console.
- * @param {ITask} the task to debug.
- * returns {ITask}
+ * creates a task that provisions a directory for use. if the directory already exists, no action is taken. 
+ * @param {string} target the directory path to provision.
+ * @returns {ITask}
  */
-export const debug = (task: ITask): Promise<string> => task.subscribe(event => console.log(format(event))).run()
+export function mkdir(target: string) : ITask
+
+/**
+ * creates a task that provisions a directory for use. if the directory already exists, no action is taken. 
+ * @param {any[]} arguments.
+ * @returns {ITask}
+ */
+export function mkdir(...args: any[]) : ITask {
+  let param = signature<{
+    target: string
+  }>(args, [
+    { pattern: ["string"], map : (args) => ({ target: args[0] })  },
+  ])
+  return script("node/mkdir", context => {
+    try {
+      let target = path.resolve(param.target)
+      context.log(target)
+      util.mkdir(target, message => context.log(message))
+      context.ok()
+    } catch (error) {
+      context.fail(error.message)
+    }
+  })
+}
