@@ -26,47 +26,30 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import { move as system_move } from "../system/file/move"
+import { signature }           from "../common/signature"
+import { Task }                from "../core/task"
+import { create }              from "../core/create"
+
 
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
+ * (synchronous) moves the given source file into the given target directory.
+ * @param {string} source the path of the file to move.
+ * @param {string} directory the directory to move this file to.
  * @returns {Task}
  */
-export function repeat(iterations: number, func: () => Task): Task
+export function move(target: string, directory: string): Task
 
-
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
-    .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
-      }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
+export function move(...args: any[]): Task {
+  return create("file/move", context => signature(args)
+  .err((err) => context.fail(err))
+  .map(["string", "string"])
+  .run((target: string, directory: string) => {
+    try {
+      system_move(target, directory, data => context.log(data))
+      context.ok()
+    } catch (error) {
+      context.fail(error)
+    }
   }))
 }

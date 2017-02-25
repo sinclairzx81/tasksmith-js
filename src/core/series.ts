@@ -26,73 +26,46 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
-
-/**
- * signature for the series function.
- */
-export interface SeriesFunc {
-  () : Array<ITask>
-}
+import { signature }  from "../common/signature"
+import { Task }       from "./task"
+import { create }     from "./create"
+import { noop }       from "./noop"
 
 /**
  * creates a task that runs its inner tasks in series.
- * @param {Array<Task>} an array of tasks to run in parallel.
- * @returns {ITask}
+ * @param {() => Array<Task>} a function that returns an array of tasks.
+ * @returns {Task}
  */
-export function series (tasks: Array<ITask>) : ITask;
+export function series(tasks: Array<Task>): Task
 
-/**
- * returns a task that executes an array of tasks in series.
- * @param {any[]} arguments.
- * @returns {ITask}
- * @example
- * 
- * let mytask = () => task.series([
- *  task.delay("1", 1000),
- *  task.delay("2", 1000),
- *  task.delay("3", 1000),
- * ])
- */
-export function series (...args: any[]) : ITask {
-  let param = signature<{
-    func   : SeriesFunc
-  }>(args, [
-      { pattern: ["function"], map : (args) => ({ func: args[0]  }) },
-  ])
-  return script("core/series", context => {
+export function series(...args: any[]): Task {
+  return create("core/series", context => signature(args)
+    .err(err => context.fail(err))
+    .map(["array"])
+    .run((tasks: Array<Task>) => {
+     
+      // process ...
+      let cancelled = false
+      let current   = noop();
 
-    let task     : ITask   = null
-    let cancelled: boolean = false
-    let tasks = null
-
-    try {
-      tasks = param.func()
-    } catch(e) {
-      context.fail(e)
-      return
-    }
-
-    context.oncancel(reason => {
-      cancelled = true
-      if(task !== null) task.cancel(reason)
-      context.fail(reason)
-    })
-    
-    const next = () => {
-      if(cancelled === true) return
-      if (tasks.length === 0) {
-        context.ok()
-        return
-      }
+      (function step() {
+        if(cancelled) return
+        if(tasks.length === 0) {
+          context.ok()
+        } else {
+          current = tasks.shift()
+          current.run(data => context.log(data))
+                 .then(() => step())
+                 .catch(error => context.fail(error))
+        }
+      }())
       
-      task = tasks.shift()
-      task.subscribe(event => context.emit(event))
-          .run      ()
-          .then     (next)
-          .catch    (error => context.fail(error))
-    }; next()
-  })
+      // abort ...
+      context.abort(() => {
+        cancelled = true
+        current.cancel()
+        tasks.forEach(task => task.cancel())
+        context.fail("aborted")
+      })
+    }))
 }

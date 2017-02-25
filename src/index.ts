@@ -26,47 +26,50 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+/// <reference path="./typings/node.d.ts" />
 
-/**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
- * @returns {Task}
- */
-export function repeat(iterations: number, func: () => Task): Task
+import {Task}          from "./core/task"
+import {cli}           from "./core/cli"
+import {create}        from "./core/create"
+import {debug}         from "./core/debug"
+import {fail}          from "./core/fail"
+import {delay}         from "./core/delay"
+import {each}          from "./core/each"
+import {ifelse}        from "./core/ifelse"
+import {ok}            from "./core/ok"
+import {parallel}      from "./core/parallel"
+import {repeat}        from "./core/repeat"
+import {retry}         from "./core/retry"
+import {series}        from "./core/series"
+import {shell}         from "./core/shell"
+import {timeout}       from "./core/timeout"
+import {trycatch}      from "./core/trycatch"
+import {watch}         from "./core/watch"
+import * as system     from "./system/index"
+import * as folder     from "./folder/index"
+import * as file       from "./file/index"
+import * as http       from "./http/index"
 
-
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
-    .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
-      }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
-  }))
+export {
+  Task,
+  cli,
+  create,
+  debug,
+  fail,
+  delay,
+  each,
+  ifelse,
+  ok,
+  parallel,
+  repeat,
+  retry,
+  series,
+  shell,
+  timeout,
+  trycatch,
+  watch,
+  system,
+  folder,
+  file,
+  http,
 }

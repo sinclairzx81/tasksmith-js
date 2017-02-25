@@ -26,67 +26,51 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
+import { signature }  from "../common/signature"
+import { Task }       from "./task"
+import { create }     from "./create"
+import { noop }       from "./noop"
 
 /**
- * a next function, passed to resolve to asynchronously resolve values.
+ * creates a if/else task where the left or right task is run based on the given condition.
+ * @param {boolean} condition a boolean value.
+ * @param {Task} ifTask the task to run if the condition is true.
+ * @param {Task} elseTask the task to run if the condition is false.
+ * @returns {Task}
  */
-export interface NextFunction<T> {
-  (value: T) : void
-}
+export function ifelse(condition: boolean, ifTask: Task, elseTask: Task): Task
 
 /**
- * a resolve function used for asynchronous resolution of values.
+ * creates a if/else task which will run the given task only if the condition is true.
+ * @param {boolean} condition a boolean value.
+ * @param {Task} ifTask the task to run if the condition is true.
+ * @returns {Task}
  */
-export interface ResolveFunction<T> {
-  (next: NextFunction<T>): void
-}
+export function ifelse(condition: boolean, ifTask: Task): Task
 
-/**
- * creates a task that executes either left or right based on a condition.
- * @param {ResolveFunction<boolean>} function to asynchronous resolve a condition.
- * @param {()=>ITask} a function that returns a new task when true.
- * @param {()=>ITask} a function that returns a new task when false.
- * @returns {ITask}
- */
-export function ifelse (condition: ResolveFunction<boolean>, left: ()=> ITask, right: () => ITask) : ITask;
 
-/**
- * creates a task that executes either left or right based on a condition.
- * @param {any[]} arguments
- * @returns {ITask}
- * @example
- * 
- * let mytask = task.ifelse(next => next(true), 
- *                          ()   => task.ok  ("running left"), 
- *                          ()   => task.fail("running right"))
- */
-export function ifelse(...args: any[]) : ITask {
-  let param = signature<{
-    condition : ResolveFunction<boolean>
-    left      : () => ITask,
-    right     : () => ITask
-  }>(args, [
-      { pattern: ["function", "function", "function"],  map: (args) => ({ condition: args[0], left: args[1], right: args[2]  })  },
-  ])
-  return script("core/ifelse", context => {
-    let task      : ITask    = null
-    let cancelled : boolean  = false
-    context.oncancel(reason => {
-      cancelled = true
-      if(task !== null) task.cancel(reason)
-      context.fail(reason)
-    })
-    
-    param.condition(result => {
-      if(cancelled === true) return
-      task = (result) ? param.left() : param.right()
-      task.subscribe(event => context.emit(event))
-          .run   ()
-          .then  (()    => context.ok())
-          .catch (error => context.fail(error))
-    })
-  })
+export function ifelse(...args: any[]): Task {
+  
+  return create("core/ifelse", context => signature(args)
+    .err((err) => context.fail(err))
+    .map(["boolean", "object", "object"])
+    .map(["boolean", "object"], (condition, ifTask) => [condition, ifTask, noop()])
+    .run((condition: boolean, ifTask: Task, elseTask: Task) => {
+
+      if(condition) {
+          ifTask.run  (data  => context.log(data))
+                .then (()    => context.ok())
+                .catch(error => context.fail(error))
+      } else {
+          elseTask.run  (data  => context.log(data))
+                  .then (()    => context.ok())
+                  .catch(error => context.fail(error))
+      }
+      
+      context.abort(() => {
+        ifTask.cancel()
+        elseTask.cancel()
+        context.fail("aborted")
+      })
+  }))
 }

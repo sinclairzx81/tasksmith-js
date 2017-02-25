@@ -26,47 +26,25 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import {Entry, scan_entry} from "../folder/scan"
+import * as path from "path"
+import * as fs   from "fs"
 
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
- * @returns {Task}
+ * (synchronous) deletes the file at the given target. if no file exists, no action.
+ * @param {string} target the path of the file to delete.
+ * @param {Function} log optional logging function.
+ * @returns {void}
  */
-export function repeat(iterations: number, func: () => Task): Task
-
-
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
-    .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
-      }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
-  }))
+export function drop(target: string, log: Function = function() {}) : void {
+  let targetEntry = scan_entry(path.resolve(target))
+  switch(targetEntry.type) {
+    case "directory":
+      break;
+    case "null":
+      break;
+    case "file":
+      log(`dropping: ${targetEntry.fullname}`)
+      fs.unlinkSync(targetEntry.fullname)
+  }
 }

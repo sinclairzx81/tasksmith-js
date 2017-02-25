@@ -26,12 +26,45 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {ITask}      from "./task"
-import {format}     from "./format"
+/**
+ * simple fixed length padding.
+ * @param {string} data the data to pad.
+ * @param {number} pad the maximum size of this pad.
+ * @returns {string}
+ */
+function pad(data:string, pad: number): string {
+  let buffer = []
+  for(let i = 0; i < pad; i++) {
+    if(i < data.length) {
+       buffer.push(data.charAt(i))
+    } else {
+      buffer.push(' ')
+    }
+  }
+  return buffer.join('')
+}
 
 /**
- * debugs a task by invoking the task and writing its output to the environment console.
- * @param {ITask} the task to debug.
- * returns {ITask}
+ * a task debugging function that can be passed into a tasks run function.
+ * @param {string} data the scoped data.
+ * @returns {string}
  */
-export const debug = (task: ITask): Promise<string> => task.subscribe(event => console.log(format(event))).run()
+export function debug (data:string) : void {
+  let tree = 
+    data.split(':::')
+    .map(part => part)
+    .map((part, index, array) => {
+      if(index < (array.length - 2)) {
+        if(index === (array.length - 3)) {
+          return "├─"
+        }
+        return  "| "
+      } return part.trim()
+    })
+    let message = tree.pop()
+    console.log(
+      '\x1b[32m', 
+      pad(tree.join(''), 24),
+      '\x1b[0m', "|", 
+      message)
+}

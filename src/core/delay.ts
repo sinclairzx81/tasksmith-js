@@ -26,66 +26,52 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
-import {ok}        from "./ok"
+import { signature }  from "../common/signature"
+import { Task }       from "./task"
+import { create }     from "./create"
+
+
 
 /**
- * creates a task that will delay for the given number of milliseconds then run its inner task.
- * @param {ms} the number of milliseconds to delay.
- * @param {() => ITask} A task to run after the delay has elapsed.
- * @returns {ITask}
+ * creates a task that delays for the given millisecond timeout then runs the given task.
+ * @param {number) ms the millisecond timeout.
+ * @param {Task} task the task to run after this delay.
+ * @returns {Task}
  */
-export function delay (ms: number, taskfunc: () => ITask) : ITask
+export function delay(ms: number, task: Task): Task
 
 /**
- * creates a task that will delay for the given number of milliseconds.
- * @param {ms} the number of milliseconds to delay.
- * @returns {ITask}
+ * creates a task that delays for the given millisecond timeout.
+ * @param {number) ms the millisecond timeout.
+ * @returns {Task}
  */
-export function delay (ms: number) : ITask
+export function delay(ms: number): Task
 
-/**
- * creates a task that will delay for the given number of milliseconds.
- * @param {any[]} arguments
- * @returns {ITask}
- */
-export function delay (...args: any[]) : ITask {
-  let param = signature<{
-    ms      : number,
-    taskfunc: () => ITask
-  }>(args, [
-    { pattern: ["number", "function"], map : (args) => ({ ms: args[0], taskfunc: args[1]     })  },
-    { pattern: ["number"],             map : (args) => ({ ms: args[0], taskfunc: () => ok()  })  },
-  ])
-  return script("core/delay", context => {
-    let cancelled = false
-    
-    /**
-     * timeout: 
-     * set timeout for delay, once
-     * elapsed, check if we havent
-     * cancelled, and if not, execute
-     * inner task.
-     */
-    let timeout = setTimeout(() => {
-      if(cancelled === true) return
-      let task = param.taskfunc()
-      task.subscribe(event => context.emit(event))
-          .run  ()
-          .then (()      => context.ok())
-          .catch((error) => context.fail(error))
-    }, param.ms)
 
-    /**
-     * cancel:
-     * listen out for cancellation.
-     */
-    context.oncancel(reason => {
-      cancelled = true
-      clearTimeout(timeout)
-      context.fail(reason)
-    })
-  })
+export function delay(...args: any[]): Task {
+  return create("core/delay", context => signature(args)
+    .err((err) => context.fail(err))
+    .map(["number", "object"])
+    .map(["number"], (ms) => [ms, undefined])
+    .run((ms: number, task: Task) => {
+
+      // process...
+      const handle = setTimeout(() => {
+        if(task === undefined) {
+          context.ok()
+        } else {
+          task.run  (data  => context.log(data))
+              .then (()    => context.ok())
+              .catch(error => context.fail(error))
+        }
+      }, ms)
+      
+      // abort...
+      context.abort(() => {
+        clearTimeout(handle)
+        if (task !== undefined)
+          task.cancel()
+        context.fail("aborted")
+      })
+  }))
 }

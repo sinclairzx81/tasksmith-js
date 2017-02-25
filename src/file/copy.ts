@@ -26,47 +26,34 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import { Entry, scan_entry }       from "../system/folder/scan"
+import { copyTo as system_copyTo } from "../system/file/copy"
+import { signature }               from "../common/signature"
+import { Task }                    from "../core/task"
+import { create }                  from "../core/create"
+import * as path from "path"
+
 
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
+ * (synchronous) copies the given source file into the target directory. If the file in the 
+ * target directory already exists, then that file is overwritten.
+ * @param {string} source the source file.
+ * @param {string} directory the directory target.
  * @returns {Task}
  */
-export function repeat(iterations: number, func: () => Task): Task
+export function copy(source: string, target: string): Task
 
 
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
-    .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
-      }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
+export function copy(...args: any[]): Task {
+  return create("file/copy", context => signature(args)
+  .err((err) => context.fail(err))
+  .map(["string", "string"])
+  .run((source: string, target: string) => {
+    try {
+      system_copyTo(source, target, data => context.log(data))
+      context.ok()
+    } catch(error) {
+      context.fail(error)
+    }
   }))
 }

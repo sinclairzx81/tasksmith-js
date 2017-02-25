@@ -26,56 +26,47 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
+import { signature }  from "../common/signature"
+import { Task }       from "./task"
+import { create }     from "./create"
+import { noop }       from "./noop"
 
 /**
- * creates a task that will try the left task, and if fail, will fallback to the right task.
- * @param {() => ITask} a function to return the left task.
- * @param {() => ITask} a function to return the right task.
- * @returns {ITask}
+ * creates a task tries to run the left task, if fail, run the right.
+ * @param {() => Task} tryfunc the try task.
+ * @param {() => Task} catchfunc the catch task.
+ * @returns {Task}
  */
-export function trycatch(left: () => ITask, right : () => ITask) : ITask;
+export function trycatch(tryTask: Task, catchTask: Task): Task
 
 /**
- * creates a task that will try the left task, and if fail, will fallback to the right task.
- * @param {() => ITask} a function to return the left task.
- * @param {() => ITask} a function to return the right task.
- * @returns {ITask}
- * @example
- * 
- * let mytask = task.trycatch(() => task.fail ("this task will fail."),
- *                            () => task.ok   ("so fallback to this task."))
+ * creates a task tries to run the left task, if fail, just continue.
+ * @param {() => Task} tryfunc the try task.
+ * @returns {Task}
  */
-export function trycatch(...args: any[]) : ITask {
-  let param = signature<{
-    left      : () => ITask,
-    right     : () => ITask
-  }>(args, [
-      { pattern: ["function", "function"], map : (args) => ({ left: args[0], right: args[1]  })  },
-  ])
-  return script("core/trycatch", context => {
-    let left      : ITask   = param.left()
-    let right     : ITask   = null
-    let cancelled : boolean = false
-    context.oncancel(reason => {
-      cancelled = true
-      if(left  !== null) left.cancel  (reason)
-      if(right !== null) right.cancel (reason)
-      context.fail(reason)
-    })
+export function trycatch(tryTask: Task): Task
 
-    left.subscribe(event => context.emit(event))
-        .run() 
-        .then(()  => context.ok())
-        .catch(() => {
-          if(cancelled === true) return
-          let right = param.right()       
-          right.subscribe(event => context.emit(event))
-               .run()
-               .then(()     => context.ok())
-               .catch(error => context.fail(error))
+export function trycatch(...args: any[]): Task {
+  return create("core/trycatch", context => signature(args)
+    .err((err) => context.fail(err))
+    .map(["object", "object"])
+    .map(["object"], (tryTask) => [tryTask, noop()])
+    .run((tryTask: Task, catchTask: Task) => {
+
+      // process ... 
+      tryTask.run(data => context.log(data))
+        .then(() => context.ok())
+        .catch(error => {
+          catchTask.run(data    => context.log(data))
+                   .then(()     => context.ok())
+                   .catch(error => context.fail(error))
         })
-  })
+
+      // abort ...
+      context.abort(() => {
+        tryTask.cancel()
+        catchTask.cancel()
+        context.fail("aborted")
+      })
+    }))
 }

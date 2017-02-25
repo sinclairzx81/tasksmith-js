@@ -26,55 +26,35 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
-
-export interface ParallelFunc {
-  () : Array<ITask>
-}
+import { signature }  from "../common/signature"
+import { Task }       from "./task"
+import { create }     from "./create"
 
 /**
  * creates a task that runs its inner tasks in parallel.
  * @param {Array<Task>} an array of tasks to run in parallel.
- * @returns {ITask}
+ * @returns {Task}
  */
-export function parallel (tasks: Array<ITask>) : ITask;
+export function parallel(tasks: Array<Task>): Task
 
-/**
- * creates a task that runs its inner tasks in parallel.
- * @param {any[]} arguments
- * @returns {ITask}
- */
-export function parallel (...args: any[]) {
-  let param = signature<{
-    func    : ParallelFunc
-  }>(args, [
-      { pattern: ["function"], map : (args) => ({ func: args[0]  })  },
-  ])
-  return script("core/parallel", context => {
-    let completed: number  = 0
-    let cancelled: boolean = false
-    let tasks = null
 
-    try {
-      tasks = param.func()
-    } catch(e) {
-      context.fail(e)
-      return
-    }
-    
-    context.oncancel(reason => {
-      cancelled = true
-      tasks.forEach(task => task.cancel(reason))
-      context.fail(reason)
-    })
-    
-    tasks.forEach(task => {
-      task.subscribe(event => context.emit(event))
-          .run  ()
-          .then (()    => { completed += 1; if(completed === tasks.length) { context.ok() } })
-          .catch(error => context.fail(error))
-    })
-  })
+export function parallel(...args: any[]): Task {
+  return create("core/parallel", context => signature(args)
+    .err(err => context.fail(err))
+    .map(["array"])
+    .run((tasks: Array<Task>) => {
+      
+      let promises = tasks.map(task => 
+        task.run(data => 
+          context.log(data)))
+
+      Promise.all(promises)
+        .then  (()    => context.ok())
+        .catch (error => context.fail(error))
+      
+      context.abort(() => {
+        tasks.forEach(task => task.cancel())
+        context.fail("aborted")
+      })
+  }))
 }

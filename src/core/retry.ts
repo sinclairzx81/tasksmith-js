@@ -26,53 +26,54 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
+import { signature }  from "../common/signature"
+import { Task }       from "./task"
+import { create }     from "./create"
+import { noop }       from "./noop"
 
 /**
- * creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
- * @param {number} the number of retries.
- * @param {() => ITask} a function to return a new task on each iteration.
- * @returns {ITask}
+ * creates a repeating task that retries its inner task for the given number of retries.
+ * @param {number} retries the number of times to repeat the inner task.
+ * @param {Task} func a task run an retry.
+ * @returns {Task}
  */
-export function retry(retries: number, taskfunc: (iteration: number) => ITask) : ITask 
+export function retry(retries: number, func: () => Task): Task
 
-/**
- * creates a retry task that attempts the inner task for the given number of retries, otherwise continue on ok.
- * @param {any[]} arguments
- * @returns {ITask}
- */
-export function retry(...args: any[]): ITask {
-  let param = signature<{
-    retries    : number,
-    taskfunc   : (iteration: number) => ITask
-  }>(args, [
-      { pattern: ["number", "function"], map : (args) => ({ retries: args[0], taskfunc: args[1]  })  },
-  ])
-  return script("core/retry", context => {
-    let iteration : number  = 0
-    let task      : ITask   = null
-    let cancelled : boolean = false
-    context.oncancel(reason => {
-      cancelled = true
-      if(task !== null) task.cancel(reason)
-      context.fail(reason)
-    })
 
-    const next = () => {
-      if(cancelled === true) return
-      if(iteration === param.retries) { 
-        context.fail() 
-        return
-      }
-      if(task !== null) task.cancel()
-      iteration += 1
-      task = param.taskfunc(iteration)
-      task.subscribe(event => context.emit(event))
-          .run   ()
-          .then  (()    => context.ok())
-          .catch (error => next())
-    }; next()    
-  })
+export function retry(...args: any[]): Task {
+  return create("core/retry", context => signature(args)
+    .err((err) => context.fail(err))
+    .map(["number", "function"])
+    .run((retries: number, func: () => Task) => {
+
+      // process ...
+      let current   = noop()
+      let cancelled = false
+      let attempts  = 0;
+      let lasterror = undefined;
+
+      (function step() {
+        if(cancelled) true
+        if(attempts >= retries) {
+          context.fail(lasterror)
+        } else {
+          attempts += 1
+          current = func()
+          current
+            .run(data    => context.log(data))
+            .then(()     => context.ok())
+            .catch(error => {
+              lasterror = error;
+              step()
+            })
+        }
+      }())
+
+      // abort ...
+      context.abort(() => {
+        cancelled = true
+        current.cancel()
+        context.fail("aborted")
+      })
+    }))
 }

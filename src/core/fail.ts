@@ -26,35 +26,12 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
-
+import { Task }      from "./task"
+import { create }    from "./create"
 
 /**
- * creates a task that immediately fails.
- * @param {string} a message to log.
- * returns {ITask}
+ * returns a task that just fails.
+ * @param {string} message optional message to fail with.
+ * @returns {Task}
  */
-export function fail(message: string): ITask
-
-/**
- * creates a task that immediately fails.
- * returns {ITask}
- */
-export function fail(): ITask
-
-/**
- * creates a task that immediately fails.
- * @param {any[]} arguments.
- * returns {ITask}
- */
-export function fail(...args: any[]): ITask {
-  let param = signature<{
-    message: string
-  }>(args, [
-      { pattern: ["string"], map : (args) => ({ message: args[0] })  },
-      { pattern: [],         map : (args) => ({ message: ""  })  },
-  ])
-  return script("core/fail", context => context.fail(param.message))
-}
+export const fail = (message: string = "") => create("core/fail", context => context.fail(message))

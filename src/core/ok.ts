@@ -26,35 +26,12 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
-
-
-/**
- * returns a task that completes successfully.
- * @param {string} info message.
- * returns {ITask}
- */
-export function ok(message: string): ITask
+import { signature }  from "../common/signature"
+import { Task }       from "./task"
+import { create }     from "./create"
 
 /**
- * returns a task that completes successfully.
- * returns {ITask}
+ * returns a task that completes immediately.
+ * @returns {Task}
  */
-export function ok(): ITask
-
-/**
- * returns a task that completes successfully.
- * @param {any[]} arguments
- * returns {ITask}
- */
-export function ok(...args: any[]): ITask {
-  let param = signature<{
-    message: string
-  }>(args, [
-      { pattern: ["string"], map : (args) => ({ message: args[0] })  },
-      { pattern: [],         map : (args) => ({ message: null  })  },
-  ])
-  return script("core/ok", context =>  context.ok(param.message || ""))
-}
+export const ok = ():Task => create("core/ok", context => context.ok())

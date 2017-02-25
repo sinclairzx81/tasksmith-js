@@ -28,110 +28,75 @@ THE SOFTWARE.
 
 "use strict";
 
-//------------------------------------------
-// (support) executes this shell script.
-//------------------------------------------
-const shell = (command, exitcode) => () => new Promise((resolve, reject) => {
-  console.log("shell:", command)
-  exitcode = exitcode || 0
+/**
+ * creates a micro cli for running tasks. 
+ * @param {string} argv the process.argv argument..
+ * @param {any} tasks a object collection of tasks.
+ * @returns {Promise}
+ */
+const cli = (argv, tasks) => new Promise((resolve, reject) => {
+  let task = argv.slice(2, argv.length)[0]
+  if(task === undefined || tasks[task] === undefined) {
+    console.log("[tasksmith micro cli]")
+    Object.keys(tasks).forEach(task => {
+      console.log(` - ${task}`)
+    });; resolve()
+  } else {
+    tasks[task]()
+      .then(resolve)
+      .catch(reject)
+  }
+})
+
+/**
+ * executes the given shell script. 
+ * @param {string} command to execute.
+ * @param {number} exitcode the expected exit code.
+ * @returns {Promise}
+ */
+const shell = (command, exitcode = 0) => new Promise((resolve, reject) => {
   const spawn    = require('child_process').spawn
   const windows  = /^win/.test(process.platform)
-  let proc = spawn(windows ? 'cmd' : 'sh', [windows ? '/c':'-c', command])
+  let proc       = spawn(windows ? 'cmd' : 'sh', [windows ? '/c':'-c', command])
   proc.stdout.setEncoding("utf8")
-  proc.stdout.on("data",  (data)  => process.stdout.write(data))
-  proc.stdout.on("error", (error) => reject(error))
-  proc.on("error",        (error) => reject(error))
-  proc.on("close",        (code)  => {
-    if(exitcode !== code) reject("shell: unexpected exit code. expected " + exitcode + " got " + code)
-    else resolve()
+  proc.stdout.on("data",  data  => process.stdout.write(data))
+  proc.stdout.on("error", error => reject(error))
+  proc.on("close",        code  => {
+    (exitcode !== code) 
+      ? reject(exitcode)
+      : resolve()
   })
 })
 
-//------------------------------------------
-// (support) concatinates the given files together.
-//------------------------------------------
-const concat = (dst, files) => () => new Promise((resolve, reject) => {
-  const fs = require("fs")
-  console.log("concat:", files, "->", dst)
-  let output  = files.map(file => fs.readFileSync(file, "utf8")).join("\n")
-  fs.writeFileSync(dst, output)
-  resolve()
-})
+/**
+ * cleans the project directories.
+ * @returns {Promise}
+ */
+const clean = () => shell("rm -rf ./bin")
 
-//------------------------------------------
-// (support) appends this file with the given string content.
-//------------------------------------------
-const append = (file, content) => () => new Promise((resolve, reject) => {
-  const fs = require("fs")
-  console.log("concat:", file, "->", content)
-  fs.writeFileSync(file, [ fs.readFileSync(file, "utf8"), content].join("\n"))
-  resolve()
-})
-//------------------------------------------
-// (support) drops the given filename.
-//------------------------------------------
-const drop = (file) => () => new Promise((resolve, reject) => {
-  const fs = require("fs")
-  console.log("drop:", file)
-  fs.unlinkSync(file)
-  resolve()
+/**
+ * builds the tasksmith project.
+ * @returns {Promise}
+ */
+const build = () => new Promise((resolve, reject) => {
+  shell("cd ./src && tsc-bundle index.ts ../bin/lib/tasksmith.js").then(() => {
+    const fs = require("fs")
+    let license = fs.readFileSync("./license", "utf8")
+    fs.writeFileSync("./bin/lib/tasksmith.js", [
+      license, "\n", "module.exports = ", 
+      fs.readFileSync("./bin/lib/tasksmith.js", "utf8")
+    ].join(""))
+    resolve()
+  }).catch(reject)
 })
 
 
-//------------------------------------------
-// (support) creates a small cli to execute tasks.
-//------------------------------------------
-const cli = (argv, tasks) => () => {
-  let args = process.argv.reduce((acc, c, index) => {
-    if(index > 1) acc.push(c)
-    return acc
-  }, [])
-  if(args.length !== 1 || tasks[args[0]] === undefined) {
-    console.log("[tasksmith-support-tasks]")
-    console.log("tasks:")
-    Object.keys(tasks).forEach(key => console.log([" - ", key].join('')))
-  } else {
-    console.log("running: " + args[0])
-    tasks[args[0]].reduce((cur, next) => cur.then(next), Promise.resolve())
-                  .then(() => console.log("done"))
-                  .catch(error => console.log(error))
-  }
-}
-
-//------------------------------------------
-// (task) cleans bin directory.
-//------------------------------------------
-const clean = () => [ shell("rm -rf ./bin") ]
-
-//------------------------------------------
-// (task) builds browser profile.
-//------------------------------------------
-const build_browser = () => [
-  shell ("tsc ./src/tasksmith-browser.ts --removeComments --module amd --target es5 --lib es2015,dom --declaration --outFile ./bin/browser/tasksmith.js"),
-]
-
-//------------------------------------------
-// (task) builds node profile.
-//------------------------------------------
-const build_node = () => [
-  shell ("tsc ./src/boot.ts --removeComments --outFile ./bin/node/boot.js"),
-  shell ("tsc ./src/tasksmith-node.ts --removeComments --module amd --target es5 --lib es2015,dom --declaration --outFile ./bin/node/tasksmith.js"),
-  concat("./bin/node/tasksmith.js", [ "./license",  "./bin/node/boot.js", "./bin/node/tasksmith.js" ]),
-  append("./bin/node/tasksmith.js", "module.exports = collect();"),
-  drop  ("./bin/node/boot.js")
-]
-
-
-
-//------------------------------------------
-// (task) builds everything.
-//------------------------------------------
-const build = () => build_browser().concat(build_node())
-
-/** the cli configuration. */
 cli(process.argv, {
-  "build-node"    : build_node(),
-  "build-browser" : build_browser(),
-  "build"         : build(),
-  "clean"         : clean()
-})()
+  "clean": clean,
+  "build": build
+}).then(() => {
+  console.log("done")
+})
+.catch(error => {
+  console.log(error)
+})

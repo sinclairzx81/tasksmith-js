@@ -26,47 +26,30 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import {scan_entry, Entry} from "../folder/scan"
+import * as path           from "path"
+import * as fs             from "fs"
 
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
- * @returns {Task}
+ * (synchronous) appends the content in the given file target. if the file does not exist, 
+ * the file is created, otherwise the file is overwritten.
+ * @param {string} target the file to append.
+ * @param {string} content the content to append.
+ * @param {Function} log optional logging function.
+ * @return {void}
  */
-export function repeat(iterations: number, func: () => Task): Task
-
-
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
-    .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
-      }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
-  }))
+export function append(target: string, content: string = "", log: Function = function() {}): void {
+  let targetEntry = scan_entry(path.resolve(target))
+  switch(targetEntry.type) {
+    case "directory":
+      throw Error(`unable to append ${targetEntry.fullname} because it is a directory.`)
+    case "file":
+      log(`appending: ${targetEntry.fullname}`)
+      fs.appendFileSync(targetEntry.fullname, content, {encoding: "utf8"})
+      break;
+    case "null":
+      log(`writing: ${targetEntry.fullname}`)
+      fs.writeFile(targetEntry.fullname, content, {encoding: "utf8"})
+      break;
+  }
 }

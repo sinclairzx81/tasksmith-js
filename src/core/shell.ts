@@ -26,47 +26,52 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import { Process }   from "../system/shell/process"
+import { signature } from "../common/signature"
+import { Task }      from "./task"
+import { create }    from "./create"
 
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
+ * runs the given shell command with the given expected exitcode.
+ * @param {string} command the shell command to run.
+ * @param {number} exitcode the expected exitcode.
  * @returns {Task}
  */
-export function repeat(iterations: number, func: () => Task): Task
+export function shell(command: string, exitcode: number): Task;
 
+/**
+ * runs the given shell command with an expected exitcode of 0.
+ * @param {string} command the shell command to run.
+ * @returns {Task}
+ */
+export function shell(command: string): Task;
 
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
+export function shell(...args: any[]): Task {
+  return create("core/shell", context => signature(args)
     .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
+    .map(["string", "number"])
+    .map(["string"], (command) => [command, 0])
+    .run((command: string, exitcode: number) => {
 
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
+      let _process: Process;
+      try {
+        _process = new Process(command)
+        _process.on("data", data => context.log(data))
+        _process.on("end", code => {
+          if (code !== exitcode) {
+            context.fail(`unexpected exitcode. expected ${exitcode} got ${code}`)
+          } else {
+            context.ok()
+          }
+        })
+      } catch (error) {
+        context.fail(error)
       }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
-  }))
+
+      context.abort(() => {
+        if (_process !== undefined) {
+          _process.dispose()
+        } context.fail("abort")
+      })
+    }))
 }

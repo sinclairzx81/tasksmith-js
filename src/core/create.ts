@@ -26,47 +26,56 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import {signature} from "../common/signature"
+import {TaskContext, Context, Task} from "./task"
 
-/**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
+
+/** 
+ * creates a new task.
+ * @param {string} name the name of this task.
+ * @param {(Context) => void} func the context function.
  * @returns {Task}
  */
-export function repeat(iterations: number, func: () => Task): Task
+export function create(name: string, func: (context: Context) => void): Task;
+
+/** 
+ * creates a new unnamed task.
+ * @param {string} name the name of this task.
+ * @param {(Context) => void} func the context function.
+ * @returns {Task}
+ */
+export function create(func: (context: Context) => void): Task;
 
 
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
+export function create(...args: Array<any>): Task {
+  return new Task(context => signature(args)
     .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
-      }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
+    .map(["string", "function"])
+    .map(["function"], (func) => ["unnamed", func])
+    .run((name: string, func: (context: Context) => void) => {
+      
+      //---------------------------------
+      // need to signal better.
+      //---------------------------------
+      context.log(`${name}:::begin`)
+      let inner = new TaskContext(
+        () => {
+          context.log(`${name}:::end`);   
+          context.ok() 
+        },
+        reason => {
+          context.log(`${name}:::failed`); 
+          context.fail(reason) 
+        },
+        data => { 
+          context.log(`${name}:::${data}`) 
+        }
+      )
+      
+      func(inner)
+      context.abort(() => {
+        inner.cancel()
+        context.fail("aborted")
+      })
   }))
 }

@@ -29,44 +29,49 @@ THE SOFTWARE.
 import { signature }  from "../common/signature"
 import { Task }       from "./task"
 import { create }     from "./create"
-import { noop }       from "./noop"
 
+
+export interface TaskOptions {
+  [name: string]: Task
+}
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
+ * creates a repeating task that enumerates each element in the given sequence.
+ * @param {Array<string>} argv process.argv.
+ * @param {TaskOptions} options a dictionary of names of tasks.
  * @returns {Task}
  */
-export function repeat(iterations: number, func: () => Task): Task
+export function cli<T>(argv: Array<string>, options: TaskOptions) : Task
 
 
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
+export function cli (...args: any[]): Task {
+  return create("core/cli", context => signature(args)
     .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
+    .map(["array", "object"])
+    .run((argv: Array<any>, options: TaskOptions) => {
+      let argument = argv.slice(2)
 
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
+      // catch no options or option not found.
+      if(argument.length === 0 || options[argument[0]] === undefined) {
+        context.log("cli options:")
+        Object.keys(options).forEach(key => context.log(` - ${key}`))
         context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
+        return
       }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
+      
+      // run task.
+      context.log(`running task: ${argument[0]}`)
+      let cancelled = false
+      let current:Task = options[argument[0]]
+      current.run  (data  => context.log(data))
+             .then (()    => context.ok())
+             .catch(error => context.fail(error))
+      
+      // abort...
+      context.abort(() => {
+        cancelled = true
+        current.cancel()
+        context.fail("aborted")
+      })
     })
-  }))
+  )
 }

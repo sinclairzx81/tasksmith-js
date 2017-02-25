@@ -26,47 +26,30 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import { create as system_create }  from "../system/folder/create"
+import { signature }                from "../common/signature"
+import { Task }                     from "../core/task"
+import { create as task_create }    from "../core/create"
 
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
+ * (synchronous) creates the given target directory recursively. If the target directory already 
+ * exists, no action. If the target directory points to a file, raise error, otherwise create.
+ * @param {string} target the directory to create.
  * @returns {Task}
  */
-export function repeat(iterations: number, func: () => Task): Task
+export function create(target: string): Task
 
 
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
-    .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
-      }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
+export function create(...args: any[]): Task {
+  return task_create("folder/create", context => signature(args)
+  .err((err) => context.fail(err))
+  .map(["string"])
+  .run((target: string) => {
+    try {
+      system_create(target, data => context.log(data))
+      context.ok()
+    } catch(error) {
+      context.fail(error)
+    }
   }))
 }

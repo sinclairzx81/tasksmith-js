@@ -26,362 +26,154 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-/**
- * formats variable length arguments on behalf of the task context.
- * @param {any[]} arguments
- * @returns {string}
- */
-const format_arguments = (args: any[]) : string => {
-  if(args === null || args === undefined) return ""
-  if(Array.isArray(args)   === false)     return ""
-  let buffer = []
-  for(let i = 0; i < args.length; i++) {
-    if(args[i] === null || args[i] === undefined) continue;
-    let str = args[i].toString()
-    if(str.length === 0) continue;
-    buffer.push(str)
-  }
-  return (buffer.length === 1) 
-    ? buffer[0]
-    : buffer.join(' ') 
+export interface Context {
+  log    (data: string)      : void
+  fail   (reason?: string)   : void
+  abort  (func   : Function) : void
+  ok     ()                  : void
 }
 
 /**
- * TaskCancellation:
- * A task cancellation token. Can optionally be
- * passed to tasks at creation, otherwise, an internal
- * cancellation object will be created. 
+ * TaskContext: A context passed into a task for fulfillment.
  */
-export class TaskCancellation {
-  private state      : "active" | "cancelled"
-  private subscribers: Function[]
+export class TaskContext implements Context {
+  private _completed : boolean
+  private _cancelled : boolean
+  private _abort     : Function
+
+  /**
+   * creates a new task context.
+   * @param {Function} _resolve the external resolve function.
+   * @param {Function} _reject  the external reject function.
+   * @param {Function} _log the external log function.
+   * @returns {TaskContext}
+   */
+  constructor(private _resolve : () => void,
+              private _reject  : (reason? : string) => void,
+              private _log     : (data    : string) => void) {
+    
+    this._completed = false
+    this._cancelled = false
+    this._abort     = function() {}
+  }
+
+  /**
+   * logs data for this context.
+   * @param {string} data the data to log.
+   * @returns {void}
+   */
+  public log(data: string): void {
+    if(this._completed === false) {
+      this._log(data)
+    }
+  }
+
+  /**
+   * completes this task, marking its state as completed.
+   * @returns {void}
+   */
+  public ok(): void {
+    if(this._completed === false) {
+      this._completed = true
+      this._resolve()
+      this._abort()
+    }
+  }
+
+  /**
+   * fails this task, marking its state as completed.
+   * @param {string} reason the reason for this failer.
+   * @returns {void}
+   */
+  public fail(reason?: string): void {
+    if(this._completed === false) {
+      this._completed = true
+      this._reject(reason)
+      this._abort()
+    }
+  }
+
+  /**
+   * signals this context for canellation.
+   * @returns {void}
+   */
+  public cancel() : void {
+    if(this._cancelled === false) {
+      this._cancelled = true
+      this._abort()
+    }
+  }
+
+  /**
+   * registers this function to listen for canellation.
+   * @returns {void}
+   */
+  public abort(func: Function): void {
+    this._abort = func
+  }
+}
+
+export class Task {
+  private _context   : TaskContext
+  private _state     : "pending" | "running" | "ok" | "fail"
+  private _cancelled : boolean
   
   /**
-   * creates a new task cancel.
-   * @returns {TaskCancel}
-   */
-  constructor() {
-    this.state       = "active"
-    this.subscribers = []
-  }
-  /**
-   * subscribes to cancellation events.
-   * @param {(reason: string) => void} a function to receive cancellations.
-   * @returns {void}
-   */
-  public subscribe(func: (reason: string) => void) : void {
-    this.subscribers.push(func)
-  }
-
-  /**
-   * emits a cancellation signal to subscribers and marks this state as cancelled.
-   * @param {string} the reason why this task was cancelled.
-   * @returns {void}
-   */
-  public cancel(reason: string) : void {
-    if(this.state === "cancelled") throw Error("cannot cancel a task more than once.")
-    this.subscribers.forEach(subscriber => subscriber(reason))
-    this.state       = "cancelled"
-    this.subscribers = []
-  }
-}
-
-/**
- * TaskEvent:
- * As tasks execute, they emit events. Examples
- * include state transitions, logging and the 
- * end state of the task.
- */
-export interface TaskEvent {
-  /** 
-   * the unique identity of this task. 
-   */
-  id   : string
-  /** 
-   * the name given to this task 
-   */
-  name : string 
-  /** 
-   * the time in which this event was created. 
-   */
-  time : Date
-  /** 
-   * the type of event being emitted. 
-   */
-  type : string
-  /** 
-   * any data associated with this event. 
-   */
-  data : string
-}
-
-/**
- * TaskContext:
- * Given to executing tasks.
- */
-export interface TaskContext {
-
-  /**
-   * emits this event to any subscribers.
-   * @param {TaskEvent} the event to emit.
-   * @returns {void}
-   */
-  emit    : ( event: TaskEvent) => void
-
-  /**
-   * logs a message for this task context.
-   * @param {...args:any[]} the arguments to log.
-   * @returns {void}
-   */
-  log      : ( ...args: any[]) => void
-
-  /**
-   * sets this task as completed.
-   * @param {...args:any[]} the arguments to log.
-   * @returns {void}
-   */
-  ok       : ( ...args: any[]) => void
-
-  /**
-   * sets this task as failed.
-   * @param {string} the reason why this task has failed.
-   * @returns {void}
-   */
-  fail     : ( ...args: any[]) => void
-
-  /**
-   * a callback the inner context and listen on for external
-   * cancellation of this task.
-   * @param {(reason: string) => void} a function to receive the cancellation reason.
-   * @returns {void}
-   */
-  oncancel : (func: ( ...args: any[]) => void) => void
-}
-
-/**
- * TaskExecutor:
- * Similar to a promise executor, given to
- * tasks to ok() or fail() the task with 
- * logging method.
- */
-export interface TaskExecutor { (context: TaskContext) : void }
-
-/**
- * TaskState:
- * The allowable states a task can be in.
- */
-export type TaskState = "pending" | "started" | "completed"  | "failed" | "cancelled"
-
-/**
- * ITask
- * interface for tasks.
- */
-export interface ITask {
-
-  /**
-   * subscribes to any events emitted from this task.
-   * @param {Function} a function to receive events.
-   * @returns {ITask}
-   */
-  subscribe(func: (event: TaskEvent) => void): ITask
-
-
-  /**
-   * runs this task.
-   * @returns {void}
-   */
-  run() : Promise<string>
-
-  /**
-   * runs this task.
-   * @returns {void}
-   */
-  cancel(reason?: string): void
-}
-
-/**
- * Task: 
- * 
- * encapsulates a unit of work.
- */
-export class Task implements ITask {
-  private subscribers  : { (event: TaskEvent):void }[]
-  private id         : string
-  private name       : string
-  private state      : TaskState
-  private executor   : TaskExecutor
-  private cancellor  : TaskCancellation
-
-  /**
    * creates a new task.
-   * @param {TaskExecutor} the task executor function.
-   * @param {TaskCancellation} an optional task cancellation token.
-   * @returns {Task<T>}
+   * @param {TaskFunction} func the task execution function.
+   * @returns {Task}
    */
-  constructor(name: string, task_executor : TaskExecutor, task_cancellor?: TaskCancellation) {
-    this.subscribers = []
-    this.state       = "pending"
-    this.executor    = task_executor
-    this.cancellor   = task_cancellor || new TaskCancellation()
-    this.name        = name
-    this.id          = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
-        return v.toString(16);
-    })
+  constructor(private func: (context: Context) => void) {
+    this._state     = "pending"
+    this._cancelled = false
   }
 
   /**
-   * starts this task.
-   * @returns {Promise<string>}
+   * runs this task with a optional logging function.
+   * @param {Function} log optional log function.
+   * @returns {Promise<any>}
    */
-  public run() : Promise<string> {
-    if(this.state !== "pending") throw Error("cannot run a task more than once.")
-
-    return new Promise<string>((resolve, reject) => {
-      /**
-       * started:
-       * tasks are only run once a caller has
-       * invoked the tasks run function, in this
-       * case, we emit a started event to any
-       * subscribers and transision the state.
-       */
-      this.state = "started"
-      this._notify ({
-        id:   this.id,
-        name: this.name,
-        time: new Date(),
-        type: "started",
-        data: ""
-      })
-
-      /**
-       * executor:
-       * Here, we invoke the task executor, 
-       * passing it the task context which is
-       * used to resolve the tasks inner promise.
-       */
-      this.executor({
-        /**
-         * emit:
-         * when executing, the task may need to
-         * emit events on behalf of inner tasks.
-         * The executor may subscribe on the inner
-         * task and emit the inner tasks events 
-         * with this function.
-         */
-        emit: (event: TaskEvent) => {
-          if(this.state === "started") {
-            this._notify (event)
-          }
-        },
-        
-        /**
-         * log:
-         * the executor may opt to emit messages out, we 
-         * pass these off to subscribers to listen 
-         * to.
-         */
-        log: (...args: any[]) => {
-          if(this.state === "started") {
-            let data = format_arguments(args)
-            this._notify ({
-              id:   this.id,
-              name: this.name,
-              time: new Date(),
-              type: "log",
-              data: data
-            })
-          }
-        },
-
-        /**
-         * ok:
-         * on ok, we set the state to completed
-         * resolve the inner promise and 
-         * emit a completed event to subscribers.
-         */
-        ok : (...args: any[]) => {
-          if(this.state === "started") {
-            this.state = "completed"
-            let data = format_arguments(args)
-            this._notify ({
-              id:   this.id,
-              name: this.name,
-              time: new Date(),
-              type: "completed",
-              data: data
-            })
-            resolve(format_arguments(args))
-          }
-        },
-
-        /**
-         * fail:
-         * on fail, we set the state to failed,
-         * reject the inner promise and 
-         * emit a failed event to subscribers.
-         */
-        fail: (...args: any[]) => {
-          if(this.state === "started") {
-            this.state = "failed"
-            let data = format_arguments(args)
-            this._notify ({ 
-              id:   this.id, 
-              name: this.name, 
-              time: new Date(), 
-              type: "failed", 
-              data: data 
-            })
-            reject(format_arguments(args))
-          }
-        },
-
-        /**
-         * oncancel:
-         * 
-         * cancellation of tasks is not handled
-         * by the task itself, rather, its pushed
-         * into the tasks executor to handle 
-         * accordingly. Here, we register this function
-         * against the tasks cancellor.
-         */
-        oncancel : (func) => {
-          if(this.state === "started") {
-            this.cancellor.subscribe(func)
-          }
-        }
-      })
-    })    
+  public run(log: (data: string) => void = (data: string) => { }): Promise<string> {
+    if(this._cancelled === true) {
+      return Promise.reject<string>("this task has been cancelled prior to commencement.")
+    } else {
+      switch(this._state) {
+        case "ok":
+        case "fail":
+        case "running":
+          return Promise.reject<string>("cannot run task in non pending state.")
+        case "pending":
+          return new Promise<string>((resolve, reject) => {
+            this._state   = "running"
+            this._context = new TaskContext (
+              ()   => { this._state = "ok";   resolve ()     },
+              data => { this._state = "fail"; reject  (data) },
+              data => { log(data) }
+            )
+            this.func(this._context)
+          })
+      }
+    }
   }
 
   /**
-   * cancels this task, immediately rejecting the task.
-   * @param {string} the reason for cancellation.
+   * sends a cancellation signal to this task. note that this
+   * task may choose to honor the cancellation, or ignore it. 
+   * internally, this raises the tasks abort() handler.
    * @returns {void}
    */
-  public cancel(reason?: string) : void {
-    if(this.state === "started")
-      this.cancellor.cancel(reason || "")
-  }
-
-  /**
-   * subscribes to any events emitted from this task.
-   * @param {(event: TaskEvent) => void} the function to subscribe.
-   * @returns {void}
-   */
-  public subscribe(func: (event: TaskEvent) => void) : ITask {
-    if(this.state !== "pending") throw Error("can only subscribe to a task while in a pending state.")
-    this.subscribers.push(func)
-    return this
-  }
-
-  /**
-   * (internal) dispatches an event to task subscribers.
-   * @param {string} the type of event being emitted.
-   * @param {string} (optional) any data accociated with the event.
-   * @returns {void}
-   */
-  private _notify(event: TaskEvent) : void {
-    this.subscribers.forEach(subscriber => subscriber(event))
+  public cancel(): void {
+    if(this._cancelled === false) {
+      this._cancelled = true
+      switch(this._state) {
+        case "ok":
+        case "fail":
+        case "pending":
+          break;
+        case "running":
+          this._context.cancel()
+          break;
+      }
+    }
   }
 }

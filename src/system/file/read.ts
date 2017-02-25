@@ -26,47 +26,26 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import {Entry, scan_entry} from "../folder/scan"
+import * as path from "path"
+import * as fs   from "fs"
 
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
- * @returns {Task}
+ * (synchronous) reads the given target and returns its contents.
+ * @param {string} target the path of the file to read.
+ * @param {string} encoding the encoding to read this file as (default is utf8)
+ * @param {Function} log optional logging function.
+ * @returns {string | Buffer}
  */
-export function repeat(iterations: number, func: () => Task): Task
-
-
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
-    .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
-        context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
-      }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
-  }))
+export function read(target: string, encoding: string = "utf8", log: Function = function() {}): string | Buffer {
+  let targetEntry = scan_entry(path.resolve(target))
+  switch(targetEntry.type) {
+    case "directory":
+      throw new Error(`cannot read ${targetEntry.fullname} because it is a directory.`)
+    case "null":
+      throw new Error(`cannot read ${targetEntry.fullname} because it does not exist.`)
+    case "file":
+      log(`reading: ${targetEntry.fullname}`)
+      return fs.readFileSync(targetEntry.fullname, encoding)
+  }
 }

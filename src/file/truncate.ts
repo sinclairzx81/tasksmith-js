@@ -26,47 +26,38 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import { signature }  from "../common/signature"
-import { Task }       from "./task"
-import { create }     from "./create"
-import { noop }       from "./noop"
+import { truncate as system_truncate } from "../system/file/truncate"
+import { signature }                   from "../common/signature"
+import { Task }                        from "../core/task"
+import { create as create_task  }      from "../core/create"
 
 /**
- * creates a repeating task that repeats its inner task for the given number of iterations.
- * @param {number} iterations the number of iterations.
- * @param {Task} func a task to repeat.
+ * (synchronous) truncates the target file and writes the given content. if the target,
+ * does not exist, this file is created.
+ * @param {string} target the path of the file to truncate.
+ * @param {string} content the content to write.
  * @returns {Task}
  */
-export function repeat(iterations: number, func: () => Task): Task
+export function truncate(target: string, content: string): Task
 
+/**
+ * (synchronous) truncates the target file. if the target, does not exist, this file is created.
+ * @param {string} target the path of the file to truncate.
+ * @returns {Task}
+ */
+export function truncate(target: string): Task
 
-export function repeat(...args: any[]): Task {
-  return create("core/repeat", context => signature(args)
+export function truncate(...args: any[]): Task {
+  return create_task("file/truncate", context => signature(args)
     .err((err) => context.fail(err))
-    .map(["number", "function"])
-    .run((iterations: number, func: () => Task) => {
-    
-    let current    = noop()
-    let cancelled  = false
-    let iteration  = 0;
-
-    (function step() {
-      if(cancelled) return
-      if(iteration >= iterations) {
+    .map(["string", "string"])
+    .map(["string"], (target) => [target, ""])
+    .run((target: string, content: string) => {
+      try {
+        system_truncate(target, content, data => context.log(data))
         context.ok()
-      } else {
-        iteration += 1
-        current    = func()
-        current.run (data   => context.log(data))
-               .then(()     => step())
-               .catch(error => context.fail(error))
+      } catch (error) {
+        context.fail(error)
       }
-    }())
-    
-    context.abort(() => {
-      cancelled = true
-      current.cancel()
-      context.fail("aborted")
-    })
   }))
 }

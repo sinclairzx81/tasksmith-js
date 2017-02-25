@@ -1,323 +1,146 @@
-# tasksmith-js
+## tasksmith
 
-## task automation library for node
-
-```js
-const task = require('./tasksmith.js')
-
-let mytask = task.series(() => [
-  task.shell("npm install"),
-  task.shell("npm start")
-])
-
-mytask.run()
-  .then(()     => console.log("ok"))
-  .catch(error => console.log(error))
-
-```
-
-## overview
-
-tasksmith is a zero dependency build automation tool for nodejs. tasksmith was primarily written
-to allow for programatic orchestration of various command line utilities, particularly development time 
-tooling (compilers, bundlers, minifiers, etc), but to also provide some directory / file provisioning 
-services.
-
-## building from source
-```
-npm install typescript -g
-node tasks build
-```
-## running tasks
-
-To run a task, call its run() function. The run() function returns a Promise type which the caller can learn of success or failure of the task.
+A task automation workflow library for node.
 
 ```javascript
-task.delay(1000)
-    .run()
-    .then(()     => console.log("done"))
-    .catch(error => console.log(error))
+task.series([
+  task.shell("ping google.com"),
+  task.shell("echo hello"),
+  task.shell("echo world"),
+  task.shell("npm install express")
+]).run(task.debug)
 
 ```
-All tasks emit various logging information, its possible to subscribe to the log events produced by a task with 
-the following.
 
-```javascript
-let mytask = () => task.series(() => [
-  task.ok   ("running task 1"),
-  task.ok   ("running task 2"),
-  task.fail ("running task 3"),
-  task.ok   ("running task 4"),
-])
+### overview
 
-// subscribe then run.
-mytask().subscribe(event => console.log(event)).run()
-```
-the above code can be simplified with the debug function, which will write logging information out
-to the environments console.
-```javascript
-let mytask = () => task.series(() => [
-  task.ok   ("running task 1"),
-  task.ok   ("running task 2"),
-  task.fail ("running task 3"),
-  task.ok   ("running task 4"),
-])
-// 
-task.debug(mytask())
-```
-which outputs the following
-```
-15:37:11  start     core/series
-15:37:11  start     core/ok
-15:37:11  log       core/ok         running task 1
-15:37:11  ok        core/ok
-15:37:11  start     core/ok
-15:37:11  log       core/ok         running task 2
-15:37:11  ok        core/ok
-15:37:11  start     core/fail
-15:37:11  log       core/fail       running task 3
-15:37:11  fail      core/fail
-15:37:11  fail      core/series
-```
-note: the task.debug() function also returns a Promise.
-## core tasks
+tasksmith is a control flow automation library for node built to help automate running command line processes in
+scenarios where workflows need to be executed in a sophisticated, potentially non linear fashion. tasksmith focuses 
+on achieving this through various control flow constructs (series/parallel/loop/repeat/retry/trycatch/ifelse/etc) and 
+supports both sequential and parallel execution of processes. tasksmith provides a number of looping constructs, task 
+cancellation, delay / deferral and conditional branching, all of which composable through tasksmiths various task 
+abstractions.
 
-tasksmith provides a number of built in tasks, these tasks may be
-run from within any javascript environment.
 
-### delay
-creates a task that will delay for the given number of milliseconds.
+### tasksmith tasks
 
-```javascript
-let mytask = () => task.series(() => [
-  task.delay(1000),
-  task.delay(1000),
-  task.delay(1000)
-])
-```
+The following table lists all the tasks built into tasksmith.
 
-### dowhile
-creates a task that repeats while a condition is true.
-```javascript
-let mytask = () => task.dowhile(next => next(true), () => task.series(() => [
-   task.ok("running 1"),
-   task.ok("running 2"),
-   task.ok("running 3")
-]))
-```
+task                   | signature                                                     | description
+---                    | ---                                                           | ---                                                                   |
+task.cli               | (argv:string[], options: {[name: string]: Task}) => Task      | creates a task that provides a simple cli to run tasks from the command line |
+task.create            | (name: string, (context: Context) => void) => Task            | creates a user defined task. |
+task.delay             | (ms: number, () => Task) => Task                              | creates a task that delays for the given number of milliseconds.      |
+task.each              | (elements: Array&lt;T&gt;, func: (element: T) => Task) : Task | creates a repeating task that enumerates each element in the given sequence. |
+task.fail              | (reason:string)  => Task                                      | creates a task that fails immediately.                                |
+task.ifelse            | (() => boolean, () => Task, () => Task)=> Task                | creates a task that runs the left or right task based on a condition. |
+task.noop              | () => Task                                                    | creates a noop task. same as task.core.ok() task.                     |
+task.ok                | () => Task                                                    | creates a task that succeeds immediately.                             |
+task.parallel          | (() => Array&lt;Task&gt;) => Task                             | creates a inner task runs its inner tasks in parallel.                |
+task.repeat            | (iterations: number, () => Task) => Task                      | creates a task that repeats for the given number of iterations. |
+task.retry             | (attempts: number, () => Task) => Task                        | creates a task that retries up to the given number of attempts. |
+task.series            | (() => Array&lt;Task&gt;) => Task                             | creates a task that runs its inner tasks in series. |
+task.shell             | (command: string, exitcode: number): Task                     | runs the given shell command with the given expected exitcode. |
+task.timeout           | (ms: number, () => Task) => Task                              | creates a task that fails if its inner task has not completed within the given millisecond timeout. |
+task.trycatch          | (() => Task, () => Task) => Task                              | creates a task that attempts the left task, and defers to the right task on fail. |
+task.watch             | (path: string, () => Task) => Task                            | creates a task that repeats its inner task on file system watch events. |
+task.file.append       | (target: string, content: string) => Task                     | creates a task that appends the target file with the given content. |
+task.file.concat       | (output: string, inputs: Array&lt;string&gt;) => Task         | creates a task that concatinates the given input paths into the output path. |
+task.file.copy         | (source: string, target: string) => Task                      | creates a task that copies the source file into the target directory. |
+task.file.create       | (target: string) => Task                                      | creates a task that creates the target file if it doesn't exist. |
+task.file.drop         | (target: string) => Task                                      | creates a task that deletes the target file if it exists. |
+task.file.move         | (source: string, target: string) => Task                      | creates a task that moves the given source file into the given target directory. |
+task.file.read         | (target: string, func: (content: string) => Task): Task       | reads the given target and returns its contents. |
+task.file.rename       | (target: string, newname: string): Task                       | creates a task that renames the given target file to the given new name. |
+task.file.replaceText  | (target: string, token: string, replacement: string) => Task  | creates a task that runs a token replacement for the given file. |
+task.file.truncate     | (target: string, content: string): Task                       | creates a task that truncates the target file and writes the given content. if the target |
+task.folder.copy       | (source: string, target: string) => Task                      | creates a task that copies the source directory into the target. |
+task.folder.create     | (target: string) => Task                                      | creates a task that creates the target directory if not exists. |
+task.folder.drop       | (target: string) => Task                                      | creates a task that deletes the target directory if not exists. |
+task.folder.merge      | (source: string, target: string): Task                        | merges the contents from the source directory into the target directory. |
+task.folder.move       | (source: string, target: string): Task                        | creates a task that moves the given source directory into the the given target directory. |
+task.folder.rename     | (target: string, newname: string) => Task                     | creates a task that renames the target directory. |
+task.http.get          | (endpoint: string, func: (content: string) => Task): Task     | creates a task that gets the http content from the remote endpoint. | 
 
-### fail
-creates a task that immediately fails.
-```javascript
-let mytask = () => task.series(() => [
-  task.ok  ("running 1"),
-  task.ok  ("running 2"),
-  task.fail("running 3")
-])
-```
 
-### ifelse
-creates a task that executes either left or right based on a condition.
-```javascript
-let mytask = () => task.ifelse(
-    next => next(true), 
-    ()   => task.ok  ("running left"), 
-    ()   => task.fail("running right"))
-```
-### ifthen
-creates a task that will run a inner task if a condition is true. otherwise ok.
-```javascript
-let mytask = () => task.ifthen(
-    next => next(true), 
-    ()   => task.ok ("only if true"))
-```
-### ok
-returns a task that completes successfully.
+### running tasks
+
+To run a task, call a tasks run() method. this method returns a Promise which the caller can use to learn of the success 
+or failure of the task. The run() method accepts a function to receive logging information from the task.
+
 ```javascript
 let mytask = () => task.ok()
+
+mytask.run(console.log)
+  .then(() => {...})
+  .catch(e => {...})
 ```
 
-### parallel
-creates a task that runs its inner tasks in parallel.
-```javascript
-// run concurrently
-let mytask = () => task.parallel(() => [
-  task.delay(1000), 
-  task.delay(1000),
-  task.delay(1000)
-])
+### debugging tasks
 
-```
-### repeat
-creates a task that repeats the given task for the given number of iterations.
+tasksmith tasks may emit a wealth of information about task. This information can be useful for debugging tasks, however
+by default, the logging information is emitted in a unformatted fashion which may become confusing for complex tasks. As 
+such, tasksmith provides a debugging function available with ```task.debug``` which can be passed to the tasks
+run function.
+
 ```javascript
-let mytask = () => task.repeat(10, () => task.ok())
+let mytask = () => task.ok()
+
+mytask.run(task.debug) // 
+  .then(() => {...})
+  .catch(e => {...})
 ```
 
-### retry
+### cancelling tasks
 
-creates a retry task that attempts the inner task for the given number of retries and fail if unable to complete.
-
-```javascript
-let mytask = () => task.retry(10, () => task.series(() => [
-  task.ok(),
-  task.ok(),
-  task.fail()
-]))
-```
-
-### script
-
-creates a new script task. This is the primary extension point for tasksmith.
+tasksmith tasks support cancellation through a tasks ```cancel()``` method. task cancellation is non trivial in javascript,
+and some tasks may or may not be cancellable. In tasksmith, a call to cancel is a signal into the running task that the 
+caller intended to cancel, but the task may or may not choose to honor that request for cancellation. Instances of tasks
+that may not cancel are tasks that complete synchronously, or complete immediately. In addition, task cancellation does
+not involve rollback. As a general rule, a user can expect a task to terminate gracefully on cancel().
 
 ```javascript
-let mytask = () => task.script("custom/task", context => {
-  context.log("logging some info")
-  context.ok()
-  // or .. context.fail()
-})
-```
-
-### series
-creates a task that runs its inner tasks in series.
-```javascript
-// run sequentially.
 let mytask = () => task.series(() => [
-  task.delay(1000),
-  task.delay(1000),
-  task.delay(1000)
+  task.delay(1000, () => task.file.create("./file1.dat")), // 1 second
+  task.delay(1000, () => task.file.create("./file2.dat")), // 2 second
+  task.delay(1000, () => task.file.create("./file3.dat")), // 3 second
 ])
+
+task.run()
+
+// may have created some files along the way.
+
+task.cancel()
 ```
 
-### timeout
-creates a task that will fail if its inner task has not 
-completed within the given number of milliseconds.
-```javascript
-let mytask = () => task.timeout(3000, () => task.series(() => [
-  task.delay(1000),
-  task.delay(1000),
-  task.delay(1000), // !!!
-  task.delay(1000),
-  task.delay(1000)
-]))
-```
+### user defined tasks
 
-### trycatch
-creates a task that will try the left task, and if fail, will fallback to the right task.
-```javascript
-let mytask = () => task.trycatch (
-    () => task.fail ("this task will fail."),
-    () => task.ok   ("so fallback to this task."))
-```
-## node tasks
-
-The following tasks are specific to node.
-
-### append
-
-creates a task that appends a file with the given content.
+user defined tasks can be created in the following way. note that the first parameter is used to scope the task with
+a given name, the convention ```type/action``` is used but not required. The ```create()``` function also takes a handler
+function which is passed a context for fulfilling this task, detailed below.
 
 ```javascript
-let mytask = () => task.append( "./file.dat", "this content will be appended.")
-```
+let mytask = () => task.create("custom/mytask", context => {
+  //------------------------------------------------------------
+  // context.ok()          - completes this task.
+  // context.fail()        - fails this task.
+  // context.log(message)  - logs a message for this task. 
+  // context.abort(handle) - handles a signal for cancellation.
+  //------------------------------------------------------------
 
-### concat
+  context.ok()
 
-creates a task that concatinates multiple files to an output file.
-
-```javascript
-let mytask = () => task.concat( "./output.dat", ["file1.dat", "file2.dat", "file3.dat"])
-```
-
-### copy
-
-creates a task that recursively copies a file or directory into a target directory.
-
-```javascript
-let mytask = () => task.copy( "./file_or_directory", "./target_directory")
-```
-
-### download
-
-creates a task that downloads a http resource and saves it as the given filename.
-
-```javascript
-let mytask = () => task.download(
-  "https://cdnjs.cloudflare.com/ajax/libs/three.js/r83/three.js", 
-  "./scripts/three/three.js")
-```
-
-### drop
-
-creates a task that recursively deletes a file or directory.
-
-```javascript
-let mytask = () => task.drop( "./file_or_directory")
-```
-
-### mkdir
-
-creates a task that provisions a directory for use. if the directory already exists, no action is taken. directories are built 
-recursively.
-
-```javascript
-let mytask = () => task.mkdir( "./some/directory")
-```
-
-### shell
-
-creates a task that executes a shell command.
-
-```javascript
-let mytask = () => task.shell("npm install typescipt")
-```
-
-### touch
-
-creates a empty file with the given path, if the file already exists, no action.
-
-```javascript
-let mytask = () => task.touch("./scripts/index.js")
-```
-
-### watch
-
-creates a task that repeats its inner task on file system changes. 
-
-```javascript
-let mytask = () => task.watch("./website", () => task.ok("something changed."))
-```
-
-### cli
-
-creates a task that creates a simple cli to run tasks by name from the command line.
-
-the following is some example script for a task file named "mytasks.js".
-
-```javascript
-"use strict";
-
-const task = require("./tasksmith.js")
-
-const clean    = () => task.ok("running clean task.")
-const install  = () => task.ok("running install task.")
-const watch    = () => task.ok("running watch task.")
-const build    = () => task.ok("running build task.")
-const publish  = () => task.ok("running publish task.")
-
-const cli = () => task.cli(process.argv, {
-  "clean"   : clean(),
-  "install" : install(),
-  "watch"   : watch(),
-  "build"   : build(),
-  "publish" : publish()
+  context.abort(() => {
+    // clean up the task.
+    context.fail()
+  })
 })
-
-task.debug(cli())
-
 ```
-which can be run at the command line with.
 
-```
-node mytasks.js [name of task]
-```
+The ```abort()``` function is optional and may be ignored if the task doesn't support cancellation, however if implementing
+cancellation, the task should clean up any resources created by the task and either ```ok()``` or ```fail()``` the task. Note,
+that the ```abort()``` function will only be called once, and only if the task is in a non completed or ```running``` state.
+
+### license 
+
+MIT

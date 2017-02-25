@@ -26,45 +26,38 @@ THE SOFTWARE.
 
 ---------------------------------------------------------------------------*/
 
-import {signature} from "../common/signature"
-import {ITask}     from "./task"
-import {script}    from "./script"
+import { signature }  from "../common/signature"
+import { Task }       from "./task"
+import { create }     from "./create"
 
 /**
- * creates a task that will fail if its inner task has not 
- * completed within the given number of milliseconds.
- * @param {number} the number of milliseconds before timeout.
- * @param {()=>ITask} a function to return a new task.
- * @returns {ITask}
+ * creates a task that delays for the given millisecond timeout then runs the given task.
+ * @param {number) ms the millisecond timeout.
+ * @param {() => Task} func the task to run.
+ * @returns {Task}
  */
-export function timeout (ms: number, taskfunc: () => ITask) : ITask;
+export function timeout(ms: number, task: Task): Task
 
-/**
- * creates a task that will fail if its inner task has not 
- * completed within the given number of milliseconds.
- * @param {any[]} arguments.
- * @returns {ITask}
- */
-export function timeout(...args: any[]): ITask {
-  let param = signature<{
-    ms      : number,
-    taskfunc: () => ITask
-  }>(args, [
-      { pattern: ["number", "function"], map : (args) => ({ ms: args[0], taskfunc: args[1]  }) },
-  ])
-  return script("core/timeout", context => {
-    let task     : ITask   = param.taskfunc()
-    let cancelled: boolean = false
-    let handle   : any     = setTimeout(() => task.cancel("timeout elaspsed."), param.ms)
-    context.oncancel(reason => {
-      cancelled = true
-      clearTimeout(handle)
-      task.cancel(reason)
-      context.fail(reason)
-    })
-    task.subscribe(event => context.emit(event))
-        .run()
-        .then(()     => context.ok())
+
+export function timeout(...args: any[]): Task {
+  return create("core/timeout", context => signature(args)
+    .err((err) => context.fail(err))
+    .map(["number", "object"])
+    .run((ms: number, task: Task) => {
+      
+      // process ...
+      task.run(data  => context.log(data))
+        .then (()    => context.ok())
         .catch(error => context.fail(error))
-  })
+      let handle = setTimeout(() => {
+        context.fail()
+      }, ms)
+
+      // abort ...
+      context.abort(() => {
+        clearTimeout(handle)
+        task.cancel()
+        context.fail("aborted")
+      })
+    }))
 }
